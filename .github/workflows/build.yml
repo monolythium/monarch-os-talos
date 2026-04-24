@@ -1,0 +1,15 @@
+# Skeleton workflow — the real Talos image build pipeline (reproducible build,
+# cosign signing, syft SBOM, ISO publish) is tracked in plans/monarch-os-talos.md
+# Stage 2. This stub exists so the repo has a workflow file from day one.
+
+name: Build Signed ISO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Placeholder
+        run: echo "TODO: Talos image build pipeline"

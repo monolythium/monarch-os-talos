@@ -1,0 +1,46 @@
+# --- Monolythium Vision base .gitignore (applies to every repo) ---
+
+# Local-only development context (NEVER push these)
+CLAUDE.md
+.claude/local/
+.claude/skills/
+.gemini/
+plans/
+docs-internal/
+*.internal.md
+AUDIT-*.md
+RESUME.md
+STATUS.md
+TODO.md
+
+# Environment + secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.keystore
+*.p12
+secrets/
+credentials/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+!.vscode/settings.recommended.json
+*.iml
+
+# Local scratch
+scratch/
+tmp/
+.cache/
+
+# Logs
+*.log
+logs/
