@@ -70,4 +70,4 @@ Found a vulnerability? Please **do not open a public issue**. Email security@mon
 
 ## License
 
-TBD — final license selection pending. Likely MIT or Apache-2.0.
+Released under the Apache License, Version 2.0. See [LICENSE](./LICENSE) for the full text.
