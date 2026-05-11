@@ -44,3 +44,6 @@ tmp/
 # Logs
 *.log
 logs/
+.build/
+_build/
+_out/

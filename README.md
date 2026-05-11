@@ -53,7 +53,24 @@ Operator guides will be published at [docs.monolythium.com](https://docs.monolyt
 make build
 ```
 
-The `make build` target is not yet wired. Building a Talos custom image requires a working Talos Image Factory pipeline; see the upstream [Talos documentation](https://www.talos.dev/) for the underlying tooling.
+This builds local test boot artifacts at:
+
+```bash
+_out/monarch-os-talos-v1.13.0-amd64.iso
+_out/monarch-os-talos-v1.13.0-amd64.raw
+```
+
+The current build includes the `protocore` binary from `../mono-core` as a Talos system extension. The service waits for a matching Talos `ExtensionServiceConfig` before starting, then initializes a testnet home under `/var/lib/protocore`, stages the baked testnet `genesis.toml`, and starts `protocore`.
+
+Example extension-service configuration:
+
+```bash
+examples/protocore-extension-service-config.yaml
+```
+
+The OS image does not ship operator secrets or a default keystore passphrase.
+
+The public release pipeline is still expected to add registry publishing, release signing, provenance, and release-channel promotion.
 
 Requirements (planned):
 - Docker or compatible OCI runtime.
