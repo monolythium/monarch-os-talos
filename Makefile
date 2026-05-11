@@ -3,7 +3,7 @@ ARCH ?= amd64
 MONO_CORE_DIR ?= ../mono-core
 OUT_DIR ?= _out
 
-.PHONY: build iso metal extension clean sbom
+.PHONY: build iso metal extension metadata smoke-qemu clean sbom
 
 build: iso metal
 
@@ -15,6 +15,12 @@ metal:
 
 extension:
 	TALOS_VERSION=$(TALOS_VERSION) ARCH=$(ARCH) MONO_CORE_DIR=$(MONO_CORE_DIR) OUT_DIR=$(OUT_DIR) ./scripts/build-protocore-extension.sh
+
+metadata:
+	TALOS_VERSION=$(TALOS_VERSION) ARCH=$(ARCH) MONO_CORE_DIR=$(MONO_CORE_DIR) OUT_DIR=$(OUT_DIR) ./scripts/write-release-metadata.sh
+
+smoke-qemu: metal
+	TALOS_VERSION=$(TALOS_VERSION) ARCH=$(ARCH) OUT_DIR=$(OUT_DIR) ./scripts/smoke-qemu.sh
 
 sbom: build
 	syft packages file:$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).iso -o spdx-json=$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).iso.spdx.json

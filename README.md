@@ -69,6 +69,7 @@ This builds local test boot artifacts at:
 ```bash
 _out/monarch-os-talos-v1.13.0-amd64.iso
 _out/monarch-os-talos-v1.13.0-amd64.raw
+_out/monarch-os-talos-v1.13.0-amd64.release.json
 ```
 
 The current build includes the `protocore` binary from `../mono-core` as a Talos system extension. The service waits for a matching Talos `ExtensionServiceConfig` before starting, then initializes a testnet home under `/var/lib/protocore`, stages the baked testnet `genesis.toml`, and starts `protocore`.
@@ -82,6 +83,16 @@ examples/protocore-extension-service-config.yaml
 The OS image does not ship operator secrets or a default keystore passphrase.
 
 The public release pipeline is still expected to add registry publishing, release signing, provenance, and release-channel promotion.
+
+Local QEMU smoke test:
+
+```bash
+make smoke-qemu
+```
+
+This boots the raw image, forwards the Talos API to `127.0.0.1:50000`, confirms QEMU holds the image through the boot window, then shuts QEMU down and writes `_out/smoke-qemu/result.json`.
+
+Set `REQUIRE_TALOSCTL_PROBE=true` to require an insecure `talosctl version` probe during the smoke test. The default mode only checks that QEMU can boot and hold the image because a configured Talos API requires the machine config/talosconfig flow.
 
 Requirements (planned):
 - Docker or compatible OCI runtime.

@@ -48,5 +48,6 @@ fi
 
 mv "$ISO_SRC" "$ISO_DST"
 sha256sum "$ISO_DST" > "$ISO_DST.sha256"
+"$ROOT_DIR/scripts/write-release-metadata.sh" >/dev/null
 
 echo "$ISO_DST"

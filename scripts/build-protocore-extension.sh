@@ -114,5 +114,6 @@ sha256sum "$TARBALL" > "$TARBALL.sha256"
 
 ln -sfn "$(basename "$TARBALL")" "$OUT_DIR/${EXTENSION_NAME}-${ARCH}.tar"
 ln -sfn "$(basename "$TARBALL.sha256")" "$OUT_DIR/${EXTENSION_NAME}-${ARCH}.tar.sha256"
+"$ROOT_DIR/scripts/write-release-metadata.sh" >/dev/null
 
 printf '%s\n' "$TARBALL"

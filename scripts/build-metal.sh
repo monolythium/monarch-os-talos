@@ -53,5 +53,6 @@ fi
 
 mv "$RAW_SRC" "$RAW_DST"
 sha256sum "$RAW_DST" > "$RAW_DST.sha256"
+"$ROOT_DIR/scripts/write-release-metadata.sh" >/dev/null
 
 echo "$RAW_DST"

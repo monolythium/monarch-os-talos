@@ -89,7 +89,7 @@ Still required before a production operator release:
 
 - signed artifact publishing
 - provenance/SBOM release workflow
-- Talos API client wiring in Monarch Desktop
+- bundled/native Talos API client hardening in Monarch Desktop
 - secret injection through the final provisioning flow
 - production network policy for RPC/P2P exposure
 - replacement of testnet genesis with release-channel genesis artifacts
