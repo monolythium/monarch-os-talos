@@ -1,6 +1,6 @@
 # monarch-os-talos
 
-Monarch OS — Talos-based signed immutable OS for Monolythium v2 validator nodes.
+Monarch OS — Talos-based signed immutable OS for Monolythium v2 operator nodes.
 
 > Part of the [Monolythium](https://monolythium.com) ecosystem — a sovereign Layer-1 for finality-first apps.
 
@@ -8,20 +8,20 @@ Monarch OS — Talos-based signed immutable OS for Monolythium v2 validator node
 
 ## What this is
 
-Monarch OS is a custom Talos Linux distribution packaged as a signed, reproducible ISO for Monolythium v2 validator nodes. The image is immutable, API-driven, and ships with the `protocore` validator binary and the `monarch` operator CLI as first-class system extensions. It is the only supported production runtime for Monolythium v2 validators.
+Monarch OS is a custom Talos Linux distribution packaged as a signed, reproducible ISO for Monolythium v2 operator nodes. The image is immutable, API-driven, and ships with the `protocore` node binary and the `monarch` operator CLI as first-class system extensions. It is the intended production runtime for Monolythium v2 operator infrastructure.
 
-There is no friendly-binary path. Tier-1 exchanges and validator operators either run the signed ISO on bare metal or they do not run a validator. This is a deliberate scope choice — the precognitive operator experience lives at the OS layer, and that experience is the moat.
+There is no friendly-binary path for production operator seats. Tier-1 exchanges and node operators run the signed ISO on bare metal, with operations driven through Monarch Desktop over authenticated control and data-plane channels.
 
 ## Who this is for
 
-- Validator operators running Monolythium v2 on production bare metal.
+- Node operators running Monolythium v2 on production bare metal.
 - Tier-1 exchanges and managed infra providers integrating Monolythium v2 at the substrate level.
 
 This image is **not** for home labs, development workstations, or Cloud-virtualized testnet infrastructure. Use plain Linux with the binary release for those.
 
 ## Install
 
-Signed ISO available on the private release track. Public release pending — no published artifacts yet.
+Signed ISO available on the private release track once release automation lands. Public release pending — no published signed artifacts yet.
 
 When the release track ships:
 
@@ -31,21 +31,32 @@ When the release track ships:
 
 ## Getting started
 
-Once a release is published, an operator runs:
+For local test builds, run:
 
 ```bash
-# Documentation-only at this stage. The pipeline that produces this image is tracked
-# in the internal Stage 2 plan.
-talosctl cluster create \
-  --install-image ghcr.io/monolythium-vision/monarch-os-talos:latest \
-  --name monolythium-validator
+make build
 ```
 
-Until the build pipeline lands, the commands above are documentation only — the container image and ISO do not yet exist.
+This produces a local ISO and raw image under `_out/`.
+
+Once a signed release channel exists, an operator flow will look like:
+
+```bash
+talosctl cluster create \
+  --install-image ghcr.io/monolythium-vision/monarch-os-talos:latest \
+  --name monolythium-operator
+```
+
+The published registry image, release signing, provenance, and channel promotion still need to be completed before this is the canonical production path.
 
 ## Documentation
 
 Operator guides will be published at [docs.monolythium.com](https://docs.monolythium.com) once the first signed release ships.
+
+Local docs:
+
+- [Monarch Desktop connectivity](./docs/monarch-desktop-connectivity.md) — how the desktop app connects to a Monarch OS node over Talos API mTLS plus Protocore RPC.
+- [Final product readiness](./docs/final-product-readiness.md) — what is still missing before Monarch OS plus Monarch Desktop can be treated as a production operator product.
 
 ## Building from source
 

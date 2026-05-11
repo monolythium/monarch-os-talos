@@ -1,18 +1,31 @@
 # protocore — Talos system extension
 
-Talos system extension that ships the `protocore` validator binary, its systemd unit, and the on-disk layout under `/var/lib/protocore`.
+Talos system extension that ships the `protocore` node binary, service definition, entrypoint, and on-disk layout under `/var/lib/protocore`.
 
 ## Status
 
-Placeholder. The extension is not yet implemented. The build pipeline that produces this extension's OCI image is part of the Stage 2 work in the internal plan.
+Local tarball build is wired through `scripts/build-protocore-extension.sh` and `make build`. Signed publishing is not wired yet.
 
-## What this extension provides (planned)
+## What this extension provides
 
-- The `protocore` binary released from the `mono-core` repository.
-- A Talos service definition that supervises `protocore` with the validator-tier configuration.
+- The `protocore` binary built from the local `mono-core` repository unless `PROTOCORE_BINARY` is provided.
+- A Talos service definition that supervises `protocore`.
+- A static entrypoint wrapper that waits for required service config before starting.
 - Persistent state under `/var/lib/protocore`, mounted as a writable Talos system path.
-- Firewall rules locking validator P2P (`29898/tcp`) and RPC (`8545/tcp`) to the operator-defined CIDR.
+- Optional baked testnet genesis staging from `mono-core/artifacts/cutover-2026-05-10/genesis.toml`.
 
 ## Building
 
-Not wired yet. Talos system extensions are OCI images built from a Dockerfile that copies the binary plus a manifest into a scratch base. See upstream [Talos system extensions documentation](https://www.talos.dev/v1.8/talos-guides/configuration/system-extensions/) for the canonical pattern.
+```bash
+make extension
+```
+
+The build writes a deterministic tarball and SHA-256 file to `_out/`.
+
+Still missing for the final product:
+
+- signed extension publishing
+- SBOM/provenance metadata
+- release-channel pinning
+- production network policy
+- final secret injection flow
