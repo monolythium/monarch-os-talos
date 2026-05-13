@@ -1,21 +1,21 @@
 # monarch-os-talos
 
-Monarch OS — Talos-based signed immutable OS for Monolythium v2 operator nodes.
+Monarch OS — Talos-based signed immutable OS for Monolythium v4.0 operator nodes.
 
-> Part of the [Monolythium](https://monolythium.com) ecosystem — a sovereign Layer-1 for finality-first apps.
+> Part of the [Monolythium](https://monolythium.com) ecosystem — a sovereign Layer-1 for autonomous-economy settlement.
 
 ---
 
 ## What this is
 
-Monarch OS is a custom Talos Linux distribution packaged as a signed, reproducible ISO for Monolythium v2 operator nodes. The image is immutable, API-driven, and ships with the `protocore` node binary and the `monarch` operator CLI as first-class system extensions. It is the intended production runtime for Monolythium v2 operator infrastructure.
+Monarch OS is a custom Talos Linux distribution packaged as a signed, reproducible ISO for Monolythium v4.0 operator nodes. The image is immutable, API-driven, and ships with the `protocore` node binary and the `monarch` operator CLI as first-class system extensions. It is the intended production runtime for Monolythium v4.0 operator infrastructure.
 
 There is no friendly-binary path for production operator seats. Tier-1 exchanges and node operators run the signed ISO on bare metal, with operations driven through Monarch Desktop over authenticated control and data-plane channels.
 
 ## Who this is for
 
-- Node operators running Monolythium v2 on production bare metal.
-- Tier-1 exchanges and managed infra providers integrating Monolythium v2 at the substrate level.
+- Node operators running Monolythium v4.0 on production bare metal.
+- Tier-1 exchanges and managed infra providers integrating Monolythium v4.0 at the substrate level.
 
 This image is **not** for home labs, development workstations, or Cloud-virtualized testnet infrastructure. Use plain Linux with the binary release for those.
 
