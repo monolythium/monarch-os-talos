@@ -142,7 +142,7 @@ int main(void) {
             "--output", "json",
             "--yes",
             "init", (char *)network,
-            "--no-validator",
+            "--no-operator",
             "--force",
             NULL,
         };
