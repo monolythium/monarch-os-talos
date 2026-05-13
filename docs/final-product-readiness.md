@@ -16,7 +16,7 @@ Monarch Desktop must not rely on SSH for Monarch OS. SSH can remain as a develop
 | Area | Missing | Required final behavior |
 | --- | --- | --- |
 | Release artifacts | Published signed ISO, raw image, and extension artifacts do not exist yet. | Every release must publish versioned artifacts, checksums, signatures, and provenance. |
-| Release provenance | No SBOM or SLSA-style provenance pipeline is wired yet. | Operators must be able to verify exactly which `mono-core` commit, Talos version, extension source, and build inputs produced the image. |
+| Release provenance | Local metadata generation exists and the `protocore` service can fail closed on a provisioned binary digest, but signed SBOM/SLSA publication is not wired yet. | Operators must be able to verify exactly which `mono-core` commit, Talos version, extension source, and build inputs produced the image. |
 | Release channels | Dev/testnet/mainnet promotion is not defined in automation. | Each channel must pin chain config, genesis, binary version, and compatibility metadata. |
 | Extension signing | The local `monarch-protocore` extension tarball is buildable but not signed or published. | Extension artifacts must be signed, checksummed, and reproducibly rebuilt. |
 | `monarch` CLI extension | The CLI extension is still placeholder-level. | The CLI extension must package the released `monarch` binary or be explicitly removed from the first product scope. |

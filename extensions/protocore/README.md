@@ -11,6 +11,7 @@ Local tarball build is wired through `scripts/build-protocore-extension.sh` and 
 - The `protocore` binary built from the local `mono-core` repository unless `PROTOCORE_BINARY` is provided.
 - A Talos service definition that supervises `protocore`.
 - A static entrypoint wrapper that waits for required service config before starting.
+- Optional fail-closed binary verification through `protocore release verify` when a release digest is provisioned.
 - Persistent state under `/var/lib/protocore`, mounted as a writable Talos system path.
 - Optional baked testnet genesis staging from `mono-core/artifacts/cutover-2026-05-10/genesis.toml`.
 
@@ -25,7 +26,7 @@ The build writes a deterministic tarball and SHA-256 file to `_out/`.
 Still missing for the final product:
 
 - signed extension publishing
-- SBOM/provenance metadata
+- SBOM/provenance publication and enforcement outside the local entrypoint
 - release-channel pinning
 - production network policy
 - final secret injection flow

@@ -3,6 +3,9 @@ kind: ExtensionServiceConfig
 name: protocore
 environment:
   # Inject through a secure release/provisioning flow. Do not commit real values.
+  # Optional fail-closed binary attestation. Use either this digest or
+  # PROTOCORE_EXPECTED_DIGEST_FILE, never both.
+  - PROTOCORE_EXPECTED_DIGEST=<replace-with-release-sha256>
   - PROTOCORE_KEYSTORE_PASSPHRASE=<replace-with-operator-keystore-passphrase>
   - PROTOCORE_P2P_LISTEN=/ip4/0.0.0.0/tcp/29898
   - PROTOCORE_DISCOVERY=hybrid

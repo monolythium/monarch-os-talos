@@ -72,7 +72,7 @@ _out/monarch-os-talos-v1.13.0-amd64.raw
 _out/monarch-os-talos-v1.13.0-amd64.release.json
 ```
 
-The current build includes the `protocore` binary from `../mono-core` as a Talos system extension. The service waits for a matching Talos `ExtensionServiceConfig` before starting, then initializes a testnet home under `/var/lib/protocore`, stages the baked testnet `genesis.toml`, and starts `protocore`.
+The current build includes the `protocore` binary from `../mono-core` as a Talos system extension. The service waits for a matching Talos `ExtensionServiceConfig` before starting, optionally verifies the binary with `protocore release verify` when `PROTOCORE_EXPECTED_DIGEST` or `PROTOCORE_EXPECTED_DIGEST_FILE` is supplied, then initializes a testnet home under `/var/lib/protocore`, stages the baked testnet `genesis.toml`, and starts `protocore`.
 
 Example extension-service configuration:
 

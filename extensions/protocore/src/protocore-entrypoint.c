@@ -42,7 +42,7 @@ static int mkdir_p(const char *path) {
     return 0;
 }
 
-static int run_and_wait(char *const argv[]) {
+static int run_and_wait(char *const argv[], const char *label) {
     pid_t pid = fork();
 
     if (pid < 0) {
@@ -63,11 +63,38 @@ static int run_and_wait(char *const argv[]) {
     }
 
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        fprintf(stderr, "protocore init failed with status %d\n", status);
+        fprintf(stderr, "%s failed with status %d\n", label, status);
         return -1;
     }
 
     return 0;
+}
+
+static int verify_protocore_release(void) {
+    const char *digest = getenv("PROTOCORE_EXPECTED_DIGEST");
+    const char *digest_file = getenv("PROTOCORE_EXPECTED_DIGEST_FILE");
+    int has_digest = digest && digest[0];
+    int has_digest_file = digest_file && digest_file[0];
+
+    if (has_digest && has_digest_file) {
+        fprintf(stderr, "set only one of PROTOCORE_EXPECTED_DIGEST or PROTOCORE_EXPECTED_DIGEST_FILE\n");
+        return -1;
+    }
+
+    if (!has_digest && !has_digest_file) {
+        return 0;
+    }
+
+    char *verify_argv[] = {
+        "./protocore",
+        "--output", "json",
+        "release", "verify",
+        has_digest ? "--digest" : "--digest-file",
+        has_digest ? (char *)digest : (char *)digest_file,
+        NULL,
+    };
+
+    return run_and_wait(verify_argv, "protocore release verify");
 }
 
 static int copy_file(const char *src, const char *dst) {
@@ -134,6 +161,10 @@ int main(void) {
     snprintf(config_path, sizeof(config_path), "%s/config.toml", home);
     snprintf(genesis_path, sizeof(genesis_path), "%s/genesis.toml", home);
 
+    if (verify_protocore_release() != 0) {
+        return 1;
+    }
+
     if (access(config_path, F_OK) != 0) {
         char *init_argv[] = {
             "./protocore",
@@ -147,7 +178,7 @@ int main(void) {
             NULL,
         };
 
-        if (run_and_wait(init_argv) != 0) {
+        if (run_and_wait(init_argv, "protocore init") != 0) {
             return 1;
         }
     }
