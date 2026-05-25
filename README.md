@@ -6,6 +6,19 @@ Monarch OS — Talos-based signed immutable OS for Monolythium v4.0 operator nod
 
 ---
 
+## Status: preview (Stage 0 bootstrap)
+
+This repository ships the OS skeleton — README, build scripts, the `protocore` Talos system extension, an example service config, and a signed-release GitHub Actions workflow shape. Most of the production pipeline machinery is **not yet wired**:
+
+- No published signed ISO, raw image, or extension OCI artifacts. The workflow exists but the heavy `make` targets it would call are placeholders today.
+- The `monarch-cli` extension is placeholder-only.
+- Release-channel promotion, SBOM/provenance publishing, first-boot operator enrollment, secret injection, network policy enforcement, upgrade/rollback automation, and the desktop Talos client are all listed as missing in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md).
+- The intended host workstation app, **Monarch Desktop**, is private and not part of this repo. The bundled Talos API client + `talosconfig` flow it depends on still needs work.
+
+Anything you build from this repo today produces local test artifacts only. Watch for a non-preview tag before treating output as production-grade.
+
+---
+
 ## What this is
 
 Monarch OS is a custom Talos Linux distribution packaged as a signed, reproducible ISO for Monolythium v4.0 operator nodes. The image is immutable, API-driven, and ships with the `protocore` node binary and the `monarch` operator CLI as first-class system extensions. It is the intended production runtime for Monolythium v4.0 operator infrastructure.
@@ -43,7 +56,7 @@ Once a signed release channel exists, an operator flow will look like:
 
 ```bash
 talosctl cluster create \
-  --install-image ghcr.io/monolythium-vision/monarch-os-talos:latest \
+  --install-image ghcr.io/monolythium/monarch-os-talos:latest \
   --name monolythium-operator
 ```
 
@@ -101,7 +114,13 @@ Requirements (planned):
 
 ## Contributing
 
-This repository is private and accepts contributions from the Monolythium core team only. External contribution policy will be published once the project is public.
+Issues and pull requests are welcome. Before opening a PR:
+
+1. Keep `_build/`, `_out/`, and other generated artifacts out of the commit (the `.gitignore` already covers them).
+2. Run `make build` locally and confirm the artifact set under `_out/` matches the README's stated output.
+3. If your change touches the `protocore` extension, the `monarch-cli` placeholder, or the build workflow, link the matching entry in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) in your PR description.
+
+For substantive changes — new Talos extensions, changes to the signed-release pipeline, secret injection / provisioning model, or anything touching the trust boundary — open an issue first so we can align on the design before the work lands.
 
 ## Security
 
