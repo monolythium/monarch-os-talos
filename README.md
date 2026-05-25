@@ -1,131 +1,205 @@
 # monarch-os-talos
 
-Monarch OS — Talos-based signed immutable OS for Monolythium v4.0 operator nodes.
+> Talos-based immutable node OS for [Monolythium](https://monolythium.com) operator infrastructure. Open-sourced for auditability; signed release pipeline is in flight.
 
-> Part of the [Monolythium](https://monolythium.com) ecosystem — a sovereign Layer-1 for autonomous-economy settlement.
+**License:** Apache-2.0 · **Status:** preview (Stage 0 bootstrap) · **Base:** [Talos Linux](https://www.talos.dev/) `v1.13.0` · **Arch:** `amd64`
 
 ---
 
 ## Status: preview (Stage 0 bootstrap)
 
-This repository ships the OS skeleton — README, build scripts, the `protocore` Talos system extension, an example service config, and a signed-release GitHub Actions workflow shape. Most of the production pipeline machinery is **not yet wired**:
+This repository is published primarily for **auditability**. The OS recipe, the `monarch-protocore` Talos system extension entrypoint, build scripts, and the signed-release workflow shape are all here in source form. What is **not yet wired**:
 
-- No published signed ISO, raw image, or extension OCI artifacts. The workflow exists but the heavy `make` targets it would call are placeholders today.
-- The `monarch-cli` extension is placeholder-only.
-- Release-channel promotion, SBOM/provenance publishing, first-boot operator enrollment, secret injection, network policy enforcement, upgrade/rollback automation, and the desktop Talos client are all listed as missing in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md).
-- The intended host workstation app, **Monarch Desktop**, is private and not part of this repo. The bundled Talos API client + `talosconfig` flow it depends on still needs work.
+- **No published signed ISO, raw image, or extension OCI artifacts.** The GitHub Actions workflow exists but the build step is a no-op stub (`echo "TODO: wire Makefile targets"`); it does not yet call the local `make` targets. There is no `ghcr.io/monolythium/monarch-os-talos:latest` to pull today.
+- **External `make build` is blocked on access to `mono-core`.** The `monarch-protocore` extension bakes the `protocore` node binary built from the (currently private) [`monolythium/mono-core`](https://github.com/monolythium/mono-core) repository. Without that source, build fails unless you supply a pre-built binary via `PROTOCORE_BINARY=/path/to/protocore`.
+- **`monarch-cli` extension is placeholder-only.** No build is wired (see [`extensions/monarch-cli/README.md`](./extensions/monarch-cli/README.md)).
+- **First-boot operator enrollment, secret injection, network policy enforcement, upgrade/rollback automation, SBOM/provenance publishing, release-channel promotion, and the bundled Monarch Desktop Talos client are all listed as missing** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md).
 
-Anything you build from this repo today produces local test artifacts only. Watch for a non-preview tag before treating output as production-grade.
+Watch this repo for the first non-preview tag before treating any output as production-grade.
 
 ---
 
 ## What this is
 
-Monarch OS is a custom Talos Linux distribution packaged as a signed, reproducible ISO for Monolythium v4.0 operator nodes. The image is immutable, API-driven, and ships with the `protocore` node binary and the `monarch` operator CLI as first-class system extensions. It is the intended production runtime for Monolythium v4.0 operator infrastructure.
+Monarch OS is a custom [Talos Linux](https://www.talos.dev/) distribution for Monolythium operator nodes. Talos is itself an API-driven immutable Linux that has no SSH, no shell, no package manager, and no traditional userspace; Monarch OS extends that base with two purpose-built Talos system extensions:
 
-There is no friendly-binary path for production operator seats. Tier-1 exchanges and node operators run the signed ISO on bare metal, with operations driven through Monarch Desktop over authenticated control and data-plane channels.
+- **`monarch-protocore`** — packages the `protocore` node binary, supervises it, optionally verifies its on-disk digest before start, stages a Monolythium testnet genesis, and persists node state at `/var/lib/protocore`.
+- **`monarch-cli`** (placeholder) — will package the `monarch` operator CLI for on-node administration.
 
-## Who this is for
+Operators interact with a running Monarch OS node from a separate workstation through:
 
-- Node operators running Monolythium v4.0 on production bare metal.
-- Tier-1 exchanges and managed infra providers integrating Monolythium v4.0 at the substrate level.
+- **Talos API on TCP `50000`**, authenticated with Talos client certificates from `talosconfig` (control plane).
+- **Protocore JSON-RPC on TCP `8545`**, exposed by the `monarch-protocore` extension service once secrets are provisioned (data plane).
 
-This image is **not** for home labs, development workstations, or Cloud-virtualized testnet infrastructure. Use plain Linux with the binary release for those.
+See [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) for the full provisioning flow.
 
-## Install
+## Why a custom node OS
 
-Signed ISO available on the private release track once release automation lands. Public release pending — no published signed artifacts yet.
+Monolythium operator infrastructure is the target of a much more aggressive threat model than a typical Linux server. Talos was chosen because the attack surface available to a remote adversary is structurally smaller than any general-purpose distribution:
 
-When the release track ships:
+- **No SSH, no shell, no `apt`, no multi-user system, no writable rootfs.** Every action is an authenticated Talos API call.
+- **Minimized kernel configuration.** Subsystems irrelevant to node operation (audio, wireless, virtualization extensions, AF_ALG, etc.) are compiled out.
+- **In-process Rust crypto** in the `protocore` binary — chain signing never touches kernel cryptographic sockets.
+- **Reproducible, signed images.** Operators can verify exactly which Talos version + `mono-core` commit + extension source produced the binary they're booting.
 
-1. Download the latest signed `monarch-os-talos-<version>.iso` from the private release feed.
-2. Verify the cosign signature against the published Monarch OS public key.
-3. Boot the target bare-metal machine from the ISO and follow the first-boot zero-touch provisioning flow.
+This image is **not** for home labs, development workstations, or virtualized testnet infrastructure — use a regular Linux + the release binary for those. Monarch OS is the production runtime for tier-1 operator seats.
 
-## Getting started
+## Repo layout
 
-For local test builds, run:
+```
+monarch-os-talos/
+├── Makefile                     # build / iso / metal / extension / metadata / smoke-qemu / sbom / clean
+├── scripts/                     # build pipeline (one shell script per target)
+│   ├── build-iso.sh
+│   ├── build-metal.sh
+│   ├── build-protocore-extension.sh
+│   ├── write-release-metadata.sh
+│   └── smoke-qemu.sh
+├── extensions/
+│   ├── protocore/               # monarch-protocore Talos system extension
+│   │   ├── README.md
+│   │   └── src/protocore-entrypoint.c
+│   └── monarch-cli/             # placeholder — not yet wired
+│       └── README.md
+├── examples/
+│   └── protocore-extension-service-config.yaml
+├── docs/
+│   ├── final-product-readiness.md      # what's missing before this is production-ready
+│   └── monarch-desktop-connectivity.md # operator workstation → node provisioning
+└── .github/workflows/build.yml  # signed-release shape (artifact build still TODO)
+```
+
+## Prerequisites
+
+To inspect and audit the source: a clone and a text editor — no toolchain required.
+
+To run `make build` locally:
+
+- **Docker** or another OCI runtime (the build uses `ghcr.io/siderolabs/imager:v1.13.0`).
+- **`git`** and **`jq`** on PATH.
+- **`cargo`** (Rust) — only if you need the extension build to compile `protocore` from source. If you set `PROTOCORE_BINARY=/path/to/prebuilt` it isn't invoked.
+- A sibling **`mono-core` checkout** at `../mono-core`, or `MONO_CORE_DIR` pointing at one. **`monolythium/mono-core` is currently a private repository**, so this step gates external full-build attempts on either a prebuilt binary or future public access.
+
+To run the QEMU smoke test:
+
+- **`qemu-system-x86_64`** on PATH (only `amd64` is supported today).
+
+## Quick start
+
+For external readers — the most useful actions today are auditing the recipe and inspecting the workflow:
 
 ```bash
+git clone https://github.com/monolythium/monarch-os-talos.git
+cd monarch-os-talos
+
+# Read the build script that assembles the Talos ISO
+less scripts/build-iso.sh
+
+# Read the system-extension entrypoint that supervises protocore
+less extensions/protocore/src/protocore-entrypoint.c
+
+# Read the readiness gap list — what's missing for production
+less docs/final-product-readiness.md
+```
+
+If you have access to `mono-core` (or a prebuilt `protocore` binary):
+
+```bash
+# Default: assumes ../mono-core sibling checkout
 make build
+
+# Or point at any other mono-core location
+make build MONO_CORE_DIR=/path/to/mono-core
+
+# Or skip cargo by supplying a prebuilt binary
+PROTOCORE_BINARY=/path/to/protocore make build
 ```
 
-This produces a local ISO and raw image under `_out/`.
+Output lands under `_out/`:
 
-Once a signed release channel exists, an operator flow will look like:
-
-```bash
-talosctl cluster create \
-  --install-image ghcr.io/monolythium/monarch-os-talos:latest \
-  --name monolythium-operator
+```
+_out/monarch-os-talos-v1.13.0-amd64.iso
+_out/monarch-os-talos-v1.13.0-amd64.raw
+_out/monarch-os-talos-v1.13.0-amd64.release.json   # via `make metadata`
+_out/monarch-os-talos-v1.13.0-amd64.iso.spdx.json  # via `make sbom`
 ```
 
-The published registry image, release signing, provenance, and channel promotion still need to be completed before this is the canonical production path.
+## Build targets
+
+| Target | Output | Notes |
+|---|---|---|
+| `make build` | iso + metal | Default. Calls `iso` and `metal` in sequence. |
+| `make iso` | `_out/*.iso` | Bootable Talos installer ISO. |
+| `make metal` | `_out/*.raw` | Bare-metal raw disk image. |
+| `make extension` | `_out/monarch-protocore-*.tar` | Just the `monarch-protocore` system-extension tarball. |
+| `make metadata` | `_out/*.release.json` | Release metadata: protocore version, mono-core commit, Talos version, arch. |
+| `make sbom` | `_out/*.spdx.json` | SBOM via `syft`. Requires `syft` on PATH. |
+| `make smoke-qemu` | `_out/smoke-qemu/result.json` | Boots the raw image, holds 20 s, optionally probes Talos API. Requires `qemu-system-x86_64`. |
+| `make clean` | — | Removes `_build/` and `_out/`. |
+
+Environment knobs:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TALOS_VERSION` | `v1.13.0` | Talos imager image tag. |
+| `ARCH` | `amd64` | Target architecture. |
+| `MONO_CORE_DIR` | `../mono-core` | Where to find `mono-core` for the protocore build. |
+| `PROTOCORE_BINARY` | `$MONO_CORE_DIR/target/release/protocore` | Path to prebuilt binary; if executable, cargo is skipped. |
+| `OUT_DIR` | `_out` | Build output directory. |
+| `REQUIRE_TALOSCTL_PROBE` | `false` | When `true`, `smoke-qemu` also runs `talosctl version --insecure`. |
+
+## Trust model + verification
+
+When the signed release pipeline lands, every published artifact will carry:
+
+- A **cosign keyless signature** (Sigstore via GitHub OIDC — verifiable with the standard `cosign verify-blob` flow against the certificate identity).
+- An **SBOM in SPDX format** generated by [`syft`](https://github.com/anchore/syft).
+- A **release metadata JSON** identifying the exact `protocore` version, `mono-core` commit, Talos version, and architecture that produced the image.
+
+Verification commands and the published cosign certificate identity will be documented here once the first signed release ships. Until then, do not run any binary that claims to be Monarch OS — there is no canonical published binary today.
 
 ## Documentation
 
-Operator guides will be published at [docs.monolythium.com](https://docs.monolythium.com) once the first signed release ships.
+- [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) — how an operator workstation provisions a Monarch OS node over Talos API mTLS + Protocore JSON-RPC; what the OS image does *not* ship (no SSH, no operator keystore passphrases, no default node identity).
+- [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) — comprehensive gap list. What's missing across release artifacts, provisioning, secret handling, network policy, health model, upgrade/rollback, recovery, desktop client, security posture, test coverage, and operator docs. Followed by a phased build plan.
 
-Local docs:
+Operator install / verify / enroll / upgrade / recover runbooks will be published at [docs.monolythium.com](https://docs.monolythium.com) once the first signed release ships.
 
-- [Monarch Desktop connectivity](./docs/monarch-desktop-connectivity.md) — how the desktop app connects to a Monarch OS node over Talos API mTLS plus Protocore RPC.
-- [Final product readiness](./docs/final-product-readiness.md) — what is still missing before Monarch OS plus Monarch Desktop can be treated as a production operator product.
+## Release pipeline status
 
-## Building from source
+`.github/workflows/build.yml` defines the shape of the signed-release flow:
 
-```bash
-make build
-```
+1. Checkout, install `cosign` and `syft`, set up Docker buildx.
+2. Log in to `ghcr.io` (uses the runner's automatic `GITHUB_TOKEN`).
+3. Run the build step — **currently a stub** (`echo "TODO: wire Makefile targets" > _out/PENDING`).
+4. If ISO/raw artifacts exist, sign them with `cosign sign-blob` (Sigstore keyless via GitHub OIDC).
+5. If an ISO exists, generate an SPDX SBOM with `syft`.
+6. Upload the contents of `_out/` as a workflow artifact.
+7. On tag push (`v*`) or manual dispatch with a tag, create a draft GitHub Release with the artifacts attached.
 
-This builds local test boot artifacts at:
+Wiring step 3 to call `make iso extension metadata sbom` is the immediate next pipeline task. Until that lands, the workflow runs to completion and produces an empty release.
 
-```bash
-_out/monarch-os-talos-v1.13.0-amd64.iso
-_out/monarch-os-talos-v1.13.0-amd64.raw
-_out/monarch-os-talos-v1.13.0-amd64.release.json
-```
+## Related projects
 
-The current build includes the `protocore` binary from `../mono-core` as a Talos system extension. The service waits for a matching Talos `ExtensionServiceConfig` before starting, optionally verifies the binary with `protocore release verify` when `PROTOCORE_EXPECTED_DIGEST` or `PROTOCORE_EXPECTED_DIGEST_FILE` is supplied, then initializes a testnet home under `/var/lib/protocore`, stages the baked testnet `genesis.toml`, and starts `protocore`.
-
-Example extension-service configuration:
-
-```bash
-examples/protocore-extension-service-config.yaml
-```
-
-The OS image does not ship operator secrets or a default keystore passphrase.
-
-The public release pipeline is still expected to add registry publishing, release signing, provenance, and release-channel promotion.
-
-Local QEMU smoke test:
-
-```bash
-make smoke-qemu
-```
-
-This boots the raw image, forwards the Talos API to `127.0.0.1:50000`, confirms QEMU holds the image through the boot window, then shuts QEMU down and writes `_out/smoke-qemu/result.json`.
-
-Set `REQUIRE_TALOSCTL_PROBE=true` to require an insecure `talosctl version` probe during the smoke test. The default mode only checks that QEMU can boot and hold the image because a configured Talos API requires the machine config/talosconfig flow.
-
-Requirements (planned):
-- Docker or compatible OCI runtime.
-- `talosctl` CLI.
-- `cosign` for signature verification.
+- [**monolythium.com**](https://monolythium.com) — protocol home, whitepaper, ecosystem links.
+- [**`monolythium/mono-studio`**](https://github.com/monolythium/mono-studio) — public native builder shell for MRV contracts and MRC assets; the developer-side companion to this operator OS.
+- **`monolythium/mono-core`** *(private)* — the chain itself, source of the `protocore` binary baked into the `monarch-protocore` extension.
+- **`monolythium/desktop-wallet`** *(private)* — the Monolythium wallet; the Monarch Desktop operator workstation app referenced in the connectivity doc lives in this ecosystem.
 
 ## Contributing
 
 Issues and pull requests are welcome. Before opening a PR:
 
-1. Keep `_build/`, `_out/`, and other generated artifacts out of the commit (the `.gitignore` already covers them).
-2. Run `make build` locally and confirm the artifact set under `_out/` matches the README's stated output.
-3. If your change touches the `protocore` extension, the `monarch-cli` placeholder, or the build workflow, link the matching entry in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) in your PR description.
+1. **Don't commit build output.** `_build/`, `_out/`, and other generated artifacts are already covered by `.gitignore` — keep them out of the diff.
+2. **Run the affected scripts locally** before declaring it ready. There is no CI workflow that runs the local build today (the GH workflow only runs on tag pushes + manual dispatch and the build step itself is a stub), so the burden is on the PR author.
+3. **If your change touches the `protocore` extension, the `monarch-cli` placeholder, the build workflow, or the signed-release pipeline**, link the matching entry in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) in your PR description.
 
-For substantive changes — new Talos extensions, changes to the signed-release pipeline, secret injection / provisioning model, or anything touching the trust boundary — open an issue first so we can align on the design before the work lands.
+For substantive changes — new Talos system extensions, changes to the trust boundary, secret-injection / provisioning model, network-policy model, or anything affecting how operators interact with a running node — open an issue first so we can align on the design before the work lands.
 
 ## Security
 
-Found a vulnerability? Please **do not open a public issue**. Email security@monolythium.com instead. Coordinated disclosure is required for any finding affecting a signed release.
+If you find a vulnerability, please **do not open a public issue**. Email `security@monolythium.com` instead. Coordinated disclosure is required for any finding that would affect a signed release.
 
 ## License
 
-Released under the Apache License, Version 2.0. See [LICENSE](./LICENSE) for the full text.
+Released under the Apache License, Version 2.0. See [`LICENSE`](./LICENSE) for the full text.
