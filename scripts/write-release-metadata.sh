@@ -32,6 +32,10 @@ git_commit() {
 }
 
 git_dirty() {
+  if [[ ! -d "$1/.git" ]]; then
+    printf 'false'
+    return
+  fi
   if ! git -C "$1" diff --quiet --ignore-submodules -- 2>/dev/null; then
     printf 'true'
     return

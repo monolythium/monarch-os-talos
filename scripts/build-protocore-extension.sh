@@ -22,11 +22,19 @@ fi
 mkdir -p "$OUT_DIR" "$BUILD_DIR"
 
 if [[ ! -x "$PROTOCORE_BINARY" ]]; then
+  if [[ ! -f "$MONO_CORE_DIR/Cargo.toml" ]]; then
+    echo "PROTOCORE_BINARY is not executable and MONO_CORE_DIR does not contain Cargo.toml: $MONO_CORE_DIR" >&2
+    exit 1
+  fi
   cargo build --release --features "$PROTOCORE_CARGO_FEATURES" --bin protocore --manifest-path "$MONO_CORE_DIR/Cargo.toml"
 fi
 
 PROTOCORE_VERSION="$("$PROTOCORE_BINARY" version --output json | jq -r '.version')"
-MONO_CORE_COMMIT="$(git -C "$MONO_CORE_DIR" rev-parse --short=12 HEAD)"
+if MONO_CORE_COMMIT="$(git -C "$MONO_CORE_DIR" rev-parse --short=12 HEAD 2>/dev/null)"; then
+  :
+else
+  MONO_CORE_COMMIT="bin$(sha256sum "$PROTOCORE_BINARY" | awk '{print substr($1,1,12)}')"
+fi
 EXTENSION_NAME="monarch-protocore"
 EXTENSION_VERSION="${PROTOCORE_VERSION}-${MONO_CORE_COMMIT}-${TALOS_VERSION}"
 STAGE_DIR="$BUILD_DIR/$EXTENSION_NAME"
