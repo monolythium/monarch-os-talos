@@ -13,7 +13,7 @@ Local tarball build is wired through `scripts/build-protocore-extension.sh` and 
 - A static entrypoint wrapper that waits for required service config before starting.
 - Optional fail-closed binary verification through `protocore release verify` when a release digest is provisioned.
 - Persistent state under `/var/lib/protocore`, mounted as a writable Talos system path.
-- Optional baked testnet genesis staging from `mono-core/artifacts/cutover-2026-05-10/genesis.toml`.
+- Optional baked testnet genesis staging when `GENESIS_TOML=/path/to/genesis.toml` is supplied at build time.
 
 ## Building
 

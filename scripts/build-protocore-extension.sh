@@ -8,18 +8,21 @@ BUILD_DIR="${BUILD_DIR:-"$ROOT_DIR/_build"}"
 ARCH="${ARCH:-amd64}"
 TALOS_VERSION="${TALOS_VERSION:-v1.13.0}"
 PROTOCORE_BINARY="${PROTOCORE_BINARY:-"$MONO_CORE_DIR/target/release/protocore"}"
-GENESIS_TOML="${GENESIS_TOML:-"$MONO_CORE_DIR/artifacts/cutover-2026-05-10/genesis.toml"}"
+PROTOCORE_CARGO_FEATURES="${PROTOCORE_CARGO_FEATURES:-mdbx,indexer-postgres}"
+GENESIS_TOML="${GENESIS_TOML:-}"
 
 [[ "$OUT_DIR" = /* ]] || OUT_DIR="$ROOT_DIR/$OUT_DIR"
 [[ "$BUILD_DIR" = /* ]] || BUILD_DIR="$ROOT_DIR/$BUILD_DIR"
 [[ "$MONO_CORE_DIR" = /* ]] || MONO_CORE_DIR="$ROOT_DIR/$MONO_CORE_DIR"
 [[ "$PROTOCORE_BINARY" = /* ]] || PROTOCORE_BINARY="$ROOT_DIR/$PROTOCORE_BINARY"
-[[ "$GENESIS_TOML" = /* ]] || GENESIS_TOML="$ROOT_DIR/$GENESIS_TOML"
+if [[ -n "$GENESIS_TOML" && "$GENESIS_TOML" != /* ]]; then
+  GENESIS_TOML="$ROOT_DIR/$GENESIS_TOML"
+fi
 
 mkdir -p "$OUT_DIR" "$BUILD_DIR"
 
 if [[ ! -x "$PROTOCORE_BINARY" ]]; then
-  cargo build --release --features mdbx --bin protocore --manifest-path "$MONO_CORE_DIR/Cargo.toml"
+  cargo build --release --features "$PROTOCORE_CARGO_FEATURES" --bin protocore --manifest-path "$MONO_CORE_DIR/Cargo.toml"
 fi
 
 PROTOCORE_VERSION="$("$PROTOCORE_BINARY" version --output json | jq -r '.version')"
@@ -50,7 +53,7 @@ EOF_MANIFEST
 cp "$PROTOCORE_BINARY" "$SERVICE_ROOT/protocore"
 gcc -static -Os -s -o "$SERVICE_ROOT/protocore-entrypoint" "$ROOT_DIR/extensions/protocore/src/protocore-entrypoint.c"
 
-if [[ -f "$GENESIS_TOML" ]]; then
+if [[ -n "$GENESIS_TOML" && -f "$GENESIS_TOML" ]]; then
   mkdir -p "$SERVICE_ROOT/defaults/testnet"
   cp "$GENESIS_TOML" "$SERVICE_ROOT/defaults/testnet/genesis.toml"
 fi

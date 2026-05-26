@@ -1,6 +1,6 @@
-# Talos image build pipeline. Builds ISO + metal image + protocore extension OCI,
-# signs everything with cosign keyless (GitHub OIDC), generates SBOM via syft.
-# Stages 1+ work (real Makefile targets) tracked in plans/monarch-os-talos.md.
+# Talos image build pipeline. Builds ISO, metal image, and the protocore
+# extension from a signed protocore release asset, then signs outputs with
+# cosign keyless and publishes SPDX SBOMs.
 
 name: Build Signed ISO
 
@@ -13,6 +13,16 @@ on:
       tag:
         description: "Release tag (e.g. v0.1.0). Empty = build only, no release."
         required: false
+        type: string
+      protocore_tag:
+        description: "protocore release tag to embed"
+        required: false
+        default: "v0.0.1-testnet"
+        type: string
+      protocore_asset:
+        description: "Linux protocore release asset"
+        required: false
+        default: "protocore-v0.0.1-testnet-x86_64-linux.tar.gz"
         type: string
 
 permissions:
@@ -41,16 +51,44 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Download protocore release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROTOCORE_TAG: ${{ github.event.inputs.protocore_tag || 'v0.0.1-testnet' }}
+          PROTOCORE_ASSET: ${{ github.event.inputs.protocore_asset || 'protocore-v0.0.1-testnet-x86_64-linux.tar.gz' }}
+        run: |
+          set -euo pipefail
+          mkdir -p _build/protocore-release _build/protocore-bin
+          gh release download "$PROTOCORE_TAG" \
+            --repo monolythium/protocore \
+            --pattern "$PROTOCORE_ASSET" \
+            --pattern "$PROTOCORE_ASSET.sha256" \
+            --pattern "$PROTOCORE_ASSET.sig" \
+            --pattern "$PROTOCORE_ASSET.pem" \
+            --dir _build/protocore-release
+          (cd _build/protocore-release && sha256sum -c "$PROTOCORE_ASSET.sha256")
+          base64 -d "_build/protocore-release/$PROTOCORE_ASSET.pem" > "_build/protocore-release/$PROTOCORE_ASSET.cert.pem"
+          cosign verify-blob \
+            --certificate "_build/protocore-release/$PROTOCORE_ASSET.cert.pem" \
+            --signature "_build/protocore-release/$PROTOCORE_ASSET.sig" \
+            --certificate-identity-regexp 'https://github.com/monolythium/protocore/.github/workflows/release.yml@refs/tags/.*' \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "_build/protocore-release/$PROTOCORE_ASSET"
+          tar -xzf "_build/protocore-release/$PROTOCORE_ASSET" -C _build/protocore-bin
+          binary="$(find _build/protocore-bin -type f -name protocore -perm -111 | head -n 1)"
+          if [ -z "$binary" ]; then
+            echo "downloaded protocore asset did not contain an executable named protocore" >&2
+            exit 1
+          fi
+          echo "PROTOCORE_BINARY=$PWD/$binary" >> "$GITHUB_ENV"
+          echo "PROTOCORE_SOURCE=github.com/monolythium/protocore@$PROTOCORE_TAG/$PROTOCORE_ASSET" >> "$GITHUB_ENV"
+
       - name: Build artifacts
         run: |
-          # When the Makefile targets land (per plans/monarch-os-talos.md Stage 2):
-          #   make iso extension metadata sbom
-          # For now this is a no-op so the workflow shape is in place from day one.
-          mkdir -p _out
-          echo "TODO: wire Makefile targets" > _out/PENDING
+          make build metadata sbom
 
       - name: Sign artifacts (cosign keyless)
-        if: hashFiles('_out/*.iso') != '' || hashFiles('_out/*.raw') != ''
+        if: hashFiles('_out/*.iso') != '' || hashFiles('_out/*.raw') != '' || hashFiles('_out/*.tar') != ''
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
@@ -58,13 +96,6 @@ jobs:
           for f in _out/*.iso _out/*.raw _out/*.tar; do
             echo "Signing $f"
             cosign sign-blob --yes "$f" --output-signature "$f.sig" --output-certificate "$f.pem"
-          done
-
-      - name: Generate SBOM
-        if: hashFiles('_out/*.iso') != ''
-        run: |
-          for iso in _out/*.iso; do
-            syft "$iso" -o spdx-json > "${iso%.iso}.sbom.spdx.json"
           done
 
       - uses: actions/upload-artifact@v4
@@ -86,10 +117,6 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           files: |
-            _out/*.iso
-            _out/*.raw
-            _out/*.sig
-            _out/*.pem
-            _out/*.sbom.spdx.json
+            _out/*
           draft: true
           fail_on_unmatched_files: false

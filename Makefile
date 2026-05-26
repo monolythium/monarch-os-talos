@@ -22,9 +22,13 @@ metadata:
 smoke-qemu: metal
 	TALOS_VERSION=$(TALOS_VERSION) ARCH=$(ARCH) OUT_DIR=$(OUT_DIR) ./scripts/smoke-qemu.sh
 
-sbom: build
-	syft packages file:$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).iso -o spdx-json=$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).iso.spdx.json
-	syft packages file:$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).raw -o spdx-json=$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).raw.spdx.json
+sbom:
+	@if [ -f "$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).iso" ]; then \
+		syft packages file:$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).iso -o spdx-json=$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).iso.spdx.json; \
+	fi
+	@if [ -f "$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).raw" ]; then \
+		syft packages file:$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).raw -o spdx-json=$(OUT_DIR)/monarch-os-talos-$(TALOS_VERSION)-$(ARCH).raw.spdx.json; \
+	fi
 
 clean:
 	rm -rf _build _out

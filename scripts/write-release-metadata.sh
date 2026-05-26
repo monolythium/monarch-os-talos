@@ -7,6 +7,7 @@ OUT_DIR="${OUT_DIR:-"$ROOT_DIR/_out"}"
 ARCH="${ARCH:-amd64}"
 TALOS_VERSION="${TALOS_VERSION:-v1.13.0}"
 PROTOCORE_BINARY="${PROTOCORE_BINARY:-"$MONO_CORE_DIR/target/release/protocore"}"
+PROTOCORE_SOURCE="${PROTOCORE_SOURCE:-local}"
 
 [[ "$OUT_DIR" = /* ]] || OUT_DIR="$ROOT_DIR/$OUT_DIR"
 [[ "$MONO_CORE_DIR" = /* ]] || MONO_CORE_DIR="$ROOT_DIR/$MONO_CORE_DIR"
@@ -50,6 +51,14 @@ protocore_version() {
   printf 'unknown'
 }
 
+protocore_binary_sha256() {
+  if [[ -x "$PROTOCORE_BINARY" ]]; then
+    sha256sum "$PROTOCORE_BINARY" | awk '{print $1}'
+    return
+  fi
+  printf 'unknown'
+}
+
 artifacts_file="$(mktemp)"
 trap 'rm -f "$artifacts_file"' EXIT
 
@@ -84,6 +93,9 @@ jq -s \
   --arg mono_core_commit "$mono_core_commit" \
   --argjson mono_core_dirty "$(git_dirty "$MONO_CORE_DIR")" \
   --arg protocore_version "$(protocore_version)" \
+  --arg protocore_source "$PROTOCORE_SOURCE" \
+  --arg protocore_binary "$(basename "$PROTOCORE_BINARY")" \
+  --arg protocore_binary_sha256 "$(protocore_binary_sha256)" \
   '{
     schema_version: $schema_version,
     generated_at: $generated_at,
@@ -100,6 +112,11 @@ jq -s \
         commit: $mono_core_commit,
         dirty: $mono_core_dirty,
         protocore_version: $protocore_version
+      },
+      protocore_binary: {
+        source: $protocore_source,
+        path: $protocore_binary,
+        sha256: $protocore_binary_sha256
       }
     },
     artifacts: .
