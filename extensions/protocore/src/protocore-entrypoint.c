@@ -137,6 +137,120 @@ static int copy_file(const char *src, const char *dst) {
     return 0;
 }
 
+static void write_quoted(FILE *out, const char *value) {
+    fputc('"', out);
+    for (const unsigned char *p = (const unsigned char *)value; *p; ++p) {
+        switch (*p) {
+            case '\\':
+                fputs("\\\\", out);
+                break;
+            case '"':
+                fputs("\\\"", out);
+                break;
+            case '\n':
+                fputs("\\n", out);
+                break;
+            case '\r':
+                fputs("\\r", out);
+                break;
+            case '\t':
+                fputs("\\t", out);
+                break;
+            default:
+                fputc(*p, out);
+                break;
+        }
+    }
+    fputc('"', out);
+}
+
+static void write_peer_list(FILE *out, const char *peers) {
+    fputc('[', out);
+    if (peers && peers[0]) {
+        char buf[4096];
+        size_t len = strlen(peers);
+        if (len >= sizeof(buf)) {
+            len = sizeof(buf) - 1;
+        }
+        memcpy(buf, peers, len);
+        buf[len] = '\0';
+
+        int first = 1;
+        char *save = NULL;
+        for (char *tok = strtok_r(buf, ",", &save); tok; tok = strtok_r(NULL, ",", &save)) {
+            while (*tok == ' ' || *tok == '\t') {
+                tok++;
+            }
+            size_t tok_len = strlen(tok);
+            while (tok_len > 0 && (tok[tok_len - 1] == ' ' || tok[tok_len - 1] == '\t')) {
+                tok[--tok_len] = '\0';
+            }
+            if (!tok[0]) {
+                continue;
+            }
+            if (!first) {
+                fputs(", ", out);
+            }
+            write_quoted(out, tok);
+            first = 0;
+        }
+    }
+    fputc(']', out);
+}
+
+static int write_first_boot_config(const char *path) {
+    const char *chain_id = env_or_default("PROTOCORE_CHAIN_ID", "69420");
+    const char *p2p_listen = env_or_default("PROTOCORE_P2P_LISTEN", "/ip4/0.0.0.0/tcp/29898");
+    const char *p2p_peers = getenv("PROTOCORE_P2P_PEERS");
+    const char *discovery = env_or_default("PROTOCORE_DISCOVERY", "hybrid");
+    const char *rpc_listen = env_or_default("PROTOCORE_RPC_LISTEN", "0.0.0.0:8545");
+    const char *postgres_url = getenv("PROTOCORE_INDEXER_POSTGRES_URL");
+    int indexer_postgres = postgres_url && postgres_url[0];
+
+    FILE *out = fopen(path, "wb");
+    if (!out) {
+        perror("fopen config");
+        return -1;
+    }
+
+    fprintf(out,
+            "# protocore node config - Monarch OS full node\n\n"
+            "[node]\n"
+            "mode = \"full\"\n\n"
+            "[consensus]\n"
+            "chain_id = %s\n"
+            "round_duration_ms = 3000\n\n"
+            "[p2p]\n"
+            "listen = ",
+            chain_id);
+    write_quoted(out, p2p_listen);
+    fputs("\npeers = ", out);
+    write_peer_list(out, p2p_peers);
+    fputs("\ndiscovery = ", out);
+    write_quoted(out, discovery);
+    fputs("\n\n[rpc]\n"
+          "enabled = true\n"
+          "public_profile_allow_self_signed = true\n"
+          "listen = ",
+          out);
+    write_quoted(out, rpc_listen);
+    fputs("\ndebug = false\n\n[indexer]\n", out);
+    if (indexer_postgres) {
+        fputs("enabled = true\nbackend = \"postgres\"\npostgres_url = ", out);
+        write_quoted(out, postgres_url);
+        fputc('\n', out);
+    } else {
+        fputs("enabled = false\n", out);
+    }
+    fputs("\n[retention]\narchive = false\nprune_period_blocks = 10000\n", out);
+
+    if (fclose(out) != 0) {
+        perror("fclose config");
+        return -1;
+    }
+    return 0;
+}
+
 static void append_optional(char **argv, size_t *idx, const char *flag, const char *env_name) {
     const char *value = getenv(env_name);
 
@@ -165,7 +279,8 @@ int main(void) {
         return 1;
     }
 
-    if (access(config_path, F_OK) != 0) {
+    int first_boot = access(config_path, F_OK) != 0;
+    if (first_boot) {
         char *init_argv[] = {
             "./protocore",
             "--home", (char *)home,
@@ -179,6 +294,9 @@ int main(void) {
         };
 
         if (run_and_wait(init_argv, "protocore init") != 0) {
+            return 1;
+        }
+        if (write_first_boot_config(config_path) != 0) {
             return 1;
         }
     }
