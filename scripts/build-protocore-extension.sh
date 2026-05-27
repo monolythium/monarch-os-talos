@@ -121,7 +121,7 @@ find "$STAGE_DIR" -type f ! -name protocore ! -name protocore-entrypoint -exec c
 find "$SERVICE_ROOT" -path '*ld-linux*.so*' -exec chmod 0755 {} +
 
 tar -C "$STAGE_DIR" --sort=name --owner=0 --group=0 --numeric-owner --mtime='UTC 2026-01-01' -cf "$TARBALL" manifest.yaml rootfs
-sha256sum "$TARBALL" > "$TARBALL.sha256"
+(cd "$(dirname "$TARBALL")" && sha256sum "$(basename "$TARBALL")" > "$(basename "$TARBALL").sha256")
 
 ln -sfn "$(basename "$TARBALL")" "$OUT_DIR/${EXTENSION_NAME}-${ARCH}.tar"
 ln -sfn "$(basename "$TARBALL.sha256")" "$OUT_DIR/${EXTENSION_NAME}-${ARCH}.tar.sha256"

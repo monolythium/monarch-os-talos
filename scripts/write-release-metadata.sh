@@ -126,5 +126,5 @@ jq -s \
     artifacts: .
   }' "$artifacts_file" > "$metadata_path"
 
-sha256sum "$metadata_path" > "$metadata_path.sha256"
+(cd "$(dirname "$metadata_path")" && sha256sum "$(basename "$metadata_path")" > "$(basename "$metadata_path").sha256")
 printf '%s\n' "$metadata_path"

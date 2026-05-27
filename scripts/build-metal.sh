@@ -52,7 +52,7 @@ if [[ ! -f "$RAW_SRC" ]]; then
 fi
 
 mv "$RAW_SRC" "$RAW_DST"
-sha256sum "$RAW_DST" > "$RAW_DST.sha256"
+(cd "$(dirname "$RAW_DST")" && sha256sum "$(basename "$RAW_DST")" > "$(basename "$RAW_DST").sha256")
 "$ROOT_DIR/scripts/write-release-metadata.sh" >/dev/null
 
 echo "$RAW_DST"
