@@ -74,6 +74,12 @@ The OS image intentionally ships without:
    - the generated `talosconfig`
    - the Protocore RPC endpoint: `http://<node-ip>:8545` or the private tunnel/WireGuard address used by the operator network
 
+## Persistence and Upgrades
+
+The ISO is an installer, not the running system: step 2 boots it, and step 5 installs Monarch OS onto the node's internal disk (`--install-disk`), after which the node runs from disk and the ISO can be removed. The immutable OS image and the node's writable data are kept on separate partitions — the entire blockchain database, configuration, and keys live under `/var/lib/protocore` on the persistent `/var` partition, never inside the OS image. Upgrades are applied with `talosctl upgrade` against a new signed image (not by re-flashing the ISO): the OS partitions are replaced while the data partition is preserved, so node state carries across upgrades at the same fixed path, and `talosctl rollback` reverts a bad upgrade without touching the data.
+
+See [Upgrades and persistent storage](./upgrade-and-storage.md) for the full lifecycle (install → run → upgrade → rollback → recovery), the disk-layout table, the TPM-sealed-key consideration, and a glossary of terms.
+
 ## Current Implementation Status
 
 Implemented in this repository:
