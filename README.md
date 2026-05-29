@@ -65,7 +65,8 @@ monarch-os-talos/
 │   └── protocore-extension-service-config.yaml
 ├── docs/
 │   ├── final-product-readiness.md      # what's missing before this is production-ready
-│   └── monarch-desktop-connectivity.md # operator workstation → node provisioning
+│   ├── monarch-desktop-connectivity.md # operator workstation → node provisioning
+│   └── upgrade-and-storage.md          # how nodes install, persist data, and upgrade
 └── .github/workflows/build.yml  # signed-release shape (artifact build still TODO)
 ```
 
@@ -161,6 +162,7 @@ Verification commands and the published cosign certificate identity will be docu
 ## Documentation
 
 - [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) — how an operator workstation provisions a Monarch OS node over Talos API mTLS + Protocore JSON-RPC; what the OS image does *not* ship (no SSH, no operator keystore passphrases, no default node identity).
+- [`docs/upgrade-and-storage.md`](./docs/upgrade-and-storage.md) — how a node installs from the ISO to an internal disk, where blockchain data is stored (`/var/lib/protocore` on the persistent partition), and how upgrades swap the OS image while preserving node state. Buzzwords explained.
 - [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) — comprehensive gap list. What's missing across release artifacts, provisioning, secret handling, network policy, health model, upgrade/rollback, recovery, desktop client, security posture, test coverage, and operator docs. Followed by a phased build plan.
 
 Operator install / verify / enroll / upgrade / recover runbooks will be published at [docs.monolythium.com](https://docs.monolythium.com) once the first signed release ships.
