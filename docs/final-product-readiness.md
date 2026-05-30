@@ -15,10 +15,10 @@ Monarch Desktop must not rely on SSH for Monarch OS. SSH can remain as a develop
 
 | Area | Missing | Required final behavior |
 | --- | --- | --- |
-| Release artifacts | Published signed ISO, raw image, and extension artifacts do not exist yet. | Every release must publish versioned artifacts, checksums, signatures, and provenance. |
-| Release provenance | Local metadata generation exists and the `protocore` service can fail closed on a provisioned binary digest, but signed SBOM/SLSA publication is not wired yet. | Operators must be able to verify exactly which `mono-core` commit, Talos version, extension source, and build inputs produced the image. |
+| Release artifacts | Published, cosign-signed preview ISOs and `monarch-protocore` extension tarballs exist (each with `.sha256`, `.sig`, `.pem`, SPDX SBOM, and `*.release.json`); a raw/metal image was published only in an early draft, not every release. | Every release must publish versioned artifacts, checksums, signatures, and provenance — including the raw image — across all supported channels. |
+| Release provenance | Each preview release ships an SPDX SBOM and a `*.release.json` provenance file; the `protocore` service can fail closed on a provisioned binary digest. SLSA-level build attestation is still not wired. | Operators must be able to verify exactly which `mono-core` commit, Talos version, extension source, and build inputs produced the image. |
 | Release channels | Dev/testnet/mainnet promotion is not defined in automation. | Each channel must pin chain config, genesis, binary version, and compatibility metadata. |
-| Extension signing | The local `monarch-protocore` extension tarball is buildable but not signed or published. | Extension artifacts must be signed, checksummed, and reproducibly rebuilt. |
+| Extension signing | The `monarch-protocore` extension tarball is built and published cosign-signed alongside the ISO; reproducible-rebuild verification is not yet documented. | Extension artifacts must be signed, checksummed, and reproducibly rebuilt. |
 | `monarch` CLI extension | The CLI extension is still placeholder-level. | The CLI extension must package the released `monarch` binary or be explicitly removed from the first product scope. |
 | First-boot provisioning | There is no final enrollment flow for operator identity, cluster membership, and secrets. | Provisioning must enroll the node without default secrets and must bind the node to its intended cluster/operator role. |
 | Secret handling | Current service config uses environment variables as the example path. | Final provisioning must use a secure secret delivery path with rotation, recovery, and auditability. |
