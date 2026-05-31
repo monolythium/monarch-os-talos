@@ -213,6 +213,7 @@ cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protoc
 
 ## Documentation
 
+- [`docs/install.md`](./docs/install.md) — install a node on **home / bare-metal** (old PC, NUC, laptop — the hardware-TPM sovereignty path) or the **top cloud providers** (Hetzner, DigitalOcean, AWS, GCP, Vultr) from the signed ISO / `raw.xz`. Verify → write → boot → sync, plus the cloud-vs-bare-metal trust posture.
 - [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) — how an operator workstation provisions a Monarch OS node over Talos API mTLS + Protocore JSON-RPC; what the OS image does *not* ship (no SSH, no operator keystore passphrases, no default node identity).
 - [`docs/upgrade-and-storage.md`](./docs/upgrade-and-storage.md) — how a node installs from the ISO to an internal disk, where blockchain data is stored (`/var/lib/protocore` on the persistent partition), and how upgrades swap the OS image while preserving node state. Buzzwords explained.
 - [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) — comprehensive gap list. What's missing across release artifacts, provisioning, secret handling, network policy, health model, upgrade/rollback, recovery, desktop client, security posture, test coverage, and operator docs. Followed by a phased build plan.
