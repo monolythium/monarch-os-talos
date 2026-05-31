@@ -85,15 +85,26 @@ jobs:
 
       - name: Build artifacts
         run: |
-          GENESIS_TOML=defaults/testnet/genesis.toml make iso metadata sbom
+          GENESIS_TOML=defaults/testnet/genesis.toml make iso metal metadata sbom
+          # Compress the raw disk image. Talos raw is ~4GB provisioned but mostly
+          # empty, so xz drops it to a few hundred MB — keeps it under the GitHub
+          # release asset limit and is directly consumable by hcloud-upload-image
+          # (Hetzner Cloud snapshot flow) and other cloud import tools.
+          shopt -s nullglob
+          for raw in _out/*.raw; do
+            xz -T0 -9 -f "$raw"
+          done
+          for xz in _out/*.raw.xz; do
+            (cd "$(dirname "$xz")" && sha256sum "$(basename "$xz")" > "$(basename "$xz").sha256")
+          done
 
       - name: Sign artifacts (cosign keyless)
-        if: hashFiles('_out/*.iso') != '' || hashFiles('_out/*.tar') != ''
+        if: hashFiles('_out/*.iso') != '' || hashFiles('_out/*.tar') != '' || hashFiles('_out/*.raw.xz') != ''
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
           shopt -s nullglob
-          for f in _out/*.iso _out/*.tar; do
+          for f in _out/*.iso _out/*.tar _out/*.raw.xz; do
             echo "Signing $f"
             cosign sign-blob --yes "$f" --output-signature "$f.sig" --output-certificate "$f.pem"
           done
@@ -106,6 +117,10 @@ jobs:
             _out/*.iso.sha256
             _out/*.iso.sig
             _out/*.iso.pem
+            _out/*.raw.xz
+            _out/*.raw.xz.sha256
+            _out/*.raw.xz.sig
+            _out/*.raw.xz.pem
             _out/*.tar
             _out/*.tar.sha256
             _out/*.tar.sig
@@ -132,6 +147,10 @@ jobs:
             _out/*.iso.sha256
             _out/*.iso.sig
             _out/*.iso.pem
+            _out/*.raw.xz
+            _out/*.raw.xz.sha256
+            _out/*.raw.xz.sig
+            _out/*.raw.xz.pem
             _out/*.tar
             _out/*.tar.sha256
             _out/*.tar.sig
