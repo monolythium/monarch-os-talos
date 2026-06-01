@@ -1,0 +1,147 @@
+{
+  "schema_version": "monarch-os-channel-policy/v1",
+  "channels": {
+    "dev": {
+      "enabled": true,
+      "release_stage": "development",
+      "chain_profile": "testnet",
+      "chain_id": "69420",
+      "desktop_channel": "dev",
+      "require_same_channel_upgrade": true,
+      "require_clean_sources": true,
+      "require_concrete_protocore": true,
+      "required_desktop_e2e_evidence": false,
+      "required_artifact_patterns": [
+        "^monarch-os-talos-.*\\.iso$",
+        "^monarch-protocore-.*\\.tar$"
+      ],
+      "required_verifier_flags": {
+        "REQUIRE_SIGNATURES": false,
+        "REQUIRE_SMOKE_QEMU": false,
+        "REQUIRE_SMOKE_QEMU_TALOSCTL": false,
+        "REQUIRE_COMPLETE_ARTIFACT_SET": false,
+        "REQUIRE_CHANNEL_METADATA": true,
+        "REQUIRE_SUBSTRATE_PROOF": true,
+        "REQUIRE_NETWORK_POLICY": true,
+        "REQUIRE_PROVISIONING_POLICY": true,
+        "REQUIRE_INCIDENT_RESPONSE_POLICY": true,
+        "REQUIRE_DISASTER_RECOVERY_POLICY": true,
+        "REQUIRE_AUDIT_TRAIL_POLICY": true,
+        "REQUIRE_SMOKE_QEMU_CONFIG_APPLY": false,
+        "REQUIRE_SMOKE_QEMU_SERVICE": false,
+        "REQUIRE_SMOKE_QEMU_RPC": false,
+        "REQUIRE_SUBSTRATE_RUNTIME_PROOF": false,
+        "REQUIRE_ENROLLMENT_RUNTIME_PROOF": false,
+        "REQUIRE_TPM_BINDING_RUNTIME_PROOF": false,
+        "REQUIRE_DM_VERITY_ACTIVE": false
+      },
+      "required_provenance_flags": {
+        "REQUIRE_COSIGN_SIGNATURES": false,
+        "REQUIRE_GITHUB_ATTESTATIONS": false,
+        "REQUIRE_SOURCE_MATCH": true,
+        "REQUIRE_MONO_CORE_SOURCE_MATCH": false,
+        "REQUIRE_EXTENSION_REBUILD_WITNESS": false,
+        "REQUIRE_RELEASE_REBUILD_WITNESS": false,
+        "RUN_REBUILD": false
+      }
+    },
+    "testnet": {
+      "enabled": true,
+      "release_stage": "operator-preview",
+      "chain_profile": "testnet",
+      "chain_id": "69420",
+      "desktop_channel": "testnet",
+      "require_same_channel_upgrade": true,
+      "require_clean_sources": true,
+      "require_concrete_protocore": true,
+      "required_desktop_e2e_evidence": true,
+      "required_artifact_patterns": [
+        "^monarch-os-talos-.*\\.iso$",
+        "^monarch-os-talos-.*\\.raw\\.xz$",
+        "^monarch-protocore-.*\\.tar$",
+        "^monarch-os-talos-.*\\.iso\\.spdx\\.json$",
+        "^monarch-os-talos-.*\\.raw\\.spdx\\.json$"
+      ],
+      "required_verifier_flags": {
+        "REQUIRE_SIGNATURES": true,
+        "REQUIRE_SMOKE_QEMU": true,
+        "REQUIRE_SMOKE_QEMU_TALOSCTL": true,
+        "REQUIRE_COMPLETE_ARTIFACT_SET": true,
+        "REQUIRE_CHANNEL_METADATA": true,
+        "REQUIRE_SUBSTRATE_PROOF": true,
+        "REQUIRE_NETWORK_POLICY": true,
+        "REQUIRE_PROVISIONING_POLICY": true,
+        "REQUIRE_INCIDENT_RESPONSE_POLICY": true,
+        "REQUIRE_DISASTER_RECOVERY_POLICY": true,
+        "REQUIRE_AUDIT_TRAIL_POLICY": true,
+        "REQUIRE_SMOKE_QEMU_CONFIG_APPLY": true,
+        "REQUIRE_SMOKE_QEMU_SERVICE": true,
+        "REQUIRE_SMOKE_QEMU_RPC": true,
+        "REQUIRE_SUBSTRATE_RUNTIME_PROOF": true,
+        "REQUIRE_ENROLLMENT_RUNTIME_PROOF": true,
+        "REQUIRE_TPM_BINDING_RUNTIME_PROOF": true,
+        "REQUIRE_DM_VERITY_ACTIVE": false
+      },
+      "required_provenance_flags": {
+        "REQUIRE_COSIGN_SIGNATURES": true,
+        "REQUIRE_GITHUB_ATTESTATIONS": true,
+        "ATTESTATION_MODE": "download",
+        "REQUIRE_SOURCE_MATCH": true,
+        "REQUIRE_MONO_CORE_SOURCE_MATCH": false,
+        "REQUIRE_EXTENSION_REBUILD_WITNESS": true,
+        "REQUIRE_RELEASE_REBUILD_WITNESS": false,
+        "RUN_REBUILD": false
+      }
+    },
+    "mainnet": {
+      "enabled": false,
+      "release_stage": "blocked",
+      "blocked_reason": "Mainnet promotion is disabled until the mainnet genesis, operator roster, enrollment/key-share lifecycle, disaster-recovery executors, configured QEMU e2e, Desktop e2e, deterministic rebuild verification, active dm-verity rootfs/root-hash attestation, and incident runbooks are published.",
+      "chain_profile": "mainnet",
+      "chain_id": "",
+      "desktop_channel": "mainnet",
+      "require_same_channel_upgrade": true,
+      "require_clean_sources": true,
+      "require_concrete_protocore": true,
+      "required_desktop_e2e_evidence": true,
+      "required_artifact_patterns": [
+        "^monarch-os-talos-.*\\.iso$",
+        "^monarch-os-talos-.*\\.raw\\.xz$",
+        "^monarch-protocore-.*\\.tar$",
+        "^monarch-os-talos-.*\\.iso\\.spdx\\.json$",
+        "^monarch-os-talos-.*\\.raw\\.spdx\\.json$"
+      ],
+      "required_verifier_flags": {
+        "REQUIRE_SIGNATURES": true,
+        "REQUIRE_SMOKE_QEMU": true,
+        "REQUIRE_SMOKE_QEMU_TALOSCTL": true,
+        "REQUIRE_COMPLETE_ARTIFACT_SET": true,
+        "REQUIRE_CHANNEL_METADATA": true,
+        "REQUIRE_SUBSTRATE_PROOF": true,
+        "REQUIRE_NETWORK_POLICY": true,
+        "REQUIRE_PROVISIONING_POLICY": true,
+        "REQUIRE_INCIDENT_RESPONSE_POLICY": true,
+        "REQUIRE_DISASTER_RECOVERY_POLICY": true,
+        "REQUIRE_AUDIT_TRAIL_POLICY": true,
+        "REQUIRE_SMOKE_QEMU_CONFIG_APPLY": true,
+        "REQUIRE_SMOKE_QEMU_SERVICE": true,
+        "REQUIRE_SMOKE_QEMU_RPC": true,
+        "REQUIRE_SUBSTRATE_RUNTIME_PROOF": true,
+        "REQUIRE_ENROLLMENT_RUNTIME_PROOF": true,
+        "REQUIRE_TPM_BINDING_RUNTIME_PROOF": true,
+        "REQUIRE_DM_VERITY_ACTIVE": true
+      },
+      "required_provenance_flags": {
+        "REQUIRE_COSIGN_SIGNATURES": true,
+        "REQUIRE_GITHUB_ATTESTATIONS": true,
+        "ATTESTATION_MODE": "download",
+        "REQUIRE_SOURCE_MATCH": true,
+        "REQUIRE_MONO_CORE_SOURCE_MATCH": true,
+        "REQUIRE_EXTENSION_REBUILD_WITNESS": true,
+        "REQUIRE_RELEASE_REBUILD_WITNESS": true,
+        "RUN_REBUILD": true,
+        "REQUIRE_REBUILD_ALL": true
+      }
+    }
+  }
+}

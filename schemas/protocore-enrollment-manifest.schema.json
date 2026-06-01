@@ -1,0 +1,483 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monolythium.com/schemas/protocore-enrollment-manifest.v1.json",
+  "title": "Monarch Protocore Enrollment Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "node"],
+  "properties": {
+    "schema_version": {
+      "const": "monarch-protocore-enrollment/v1"
+    },
+    "node": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "chain_profile", "chain_id"],
+      "properties": {
+        "role": {
+          "enum": ["full", "archive", "operator-signing", "bridge"]
+        },
+        "chain_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chain_id": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        },
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "operator": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "address": {
+          "type": "string",
+          "pattern": "^(mono1[0-9a-z]+|0x[0-9a-fA-F]{40})$"
+        },
+        "position": {
+          "type": "string",
+          "enum": ["active", "standby"]
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        }
+      }
+    },
+    "cluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        },
+        "size": {
+          "const": 10
+        },
+        "threshold": {
+          "const": 7
+        },
+        "active_members": {
+          "const": 7
+        },
+        "standby_members": {
+          "const": 3
+        },
+        "dkg_epoch": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        }
+      }
+    },
+    "endpoint_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rpc_listen": {
+          "type": "string",
+          "pattern": "^[0-9A-Za-z_.:-]+:[0-9]+$"
+        },
+        "p2p_listen": {
+          "type": "string",
+          "pattern": "^/ip[46]/.+/tcp/[0-9]+$"
+        },
+        "discovery": {
+          "type": "string",
+          "enum": ["hybrid", "mdns", "kademlia", "static", "off"]
+        }
+      }
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "expected_digest": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "attestation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "tpm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": ["hardware-tpm2", "vtpm-testnet"]
+            },
+            "pcr_bank": {
+              "type": "string",
+              "enum": ["sha256", "sha384"]
+            },
+            "pcr_values": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["0", "2", "4", "7"],
+              "patternProperties": {
+                "^[0-9]+$": {
+                  "type": "string",
+                  "pattern": "^[0-9a-fA-F]{64}([0-9a-fA-F]{32})?$"
+                }
+              }
+            },
+            "quote_file": {
+              "type": "string",
+              "pattern": "^/var/lib/protocore/attestation/.+"
+            },
+            "event_log_file": {
+              "type": "string",
+              "pattern": "^/var/lib/protocore/attestation/.+"
+            },
+            "quote_sha256": {
+              "type": "string",
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+            },
+            "event_log_sha256": {
+              "type": "string",
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+            },
+            "quote_nonce": {
+              "type": "string",
+              "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+            },
+            "quote_verification": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "tool",
+                "ak_public_file",
+                "quote_signature_file",
+                "pcr_digest_file",
+                "ak_public_sha256",
+                "quote_signature_sha256",
+                "pcr_digest_sha256"
+              ],
+              "properties": {
+                "tool": {
+                  "const": "tpm2_checkquote"
+                },
+                "ak_public_file": {
+                  "type": "string",
+                  "pattern": "^/var/lib/protocore/attestation/.+"
+                },
+                "quote_signature_file": {
+                  "type": "string",
+                  "pattern": "^/var/lib/protocore/attestation/.+"
+                },
+                "pcr_digest_file": {
+                  "type": "string",
+                  "pattern": "^/var/lib/protocore/attestation/.+"
+                },
+                "ak_public_sha256": {
+                  "type": "string",
+                  "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+                },
+                "quote_signature_sha256": {
+                  "type": "string",
+                  "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+                },
+                "pcr_digest_sha256": {
+                  "type": "string",
+                  "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+                }
+              }
+            },
+            "sealed_key_policy": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pcrs",
+                "key_share_refs",
+                "policy_digest",
+                "dkg_transcript_sha256",
+                "sealed_share_sha256"
+              ],
+              "properties": {
+                "pcrs": {
+                  "type": "array",
+                  "minItems": 4,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 23
+                  }
+                },
+                "key_share_refs": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "policy_digest": {
+                  "type": "string",
+                  "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+                },
+                "dkg_transcript_sha256": {
+                  "type": "string",
+                  "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+                },
+                "sealed_share_sha256": {
+                  "type": "string",
+                  "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "on_chain_registration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "registry_contract",
+        "operator_address",
+        "cluster_id",
+        "operator_index",
+        "registration_tx_hash",
+        "dag_round",
+        "quorum_certificate_hash",
+        "registration_method",
+        "registration_function_selector",
+        "registration_calldata_hash",
+        "attestation_embedded_in_registration",
+        "release_expected_digest",
+        "quote_sha256",
+        "event_log_sha256",
+        "pcr_policy_hash",
+        "dkg_transcript_sha256",
+        "sealed_share_sha256",
+        "attestation_payload_hash"
+      ],
+      "properties": {
+        "registry_contract": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{40}$"
+        },
+        "operator_address": {
+          "type": "string",
+          "pattern": "^(mono1[0-9a-z]+|0x[0-9a-fA-F]{40})$"
+        },
+        "cluster_id": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        },
+        "operator_index": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9
+        },
+        "registration_tx_hash": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{64}$"
+        },
+        "dag_round": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        },
+        "quorum_certificate_hash": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "registration_method": {
+          "const": "register"
+        },
+        "registration_function_selector": {
+          "type": "string",
+          "pattern": "^0x[0-9a-fA-F]{8}$"
+        },
+        "registration_calldata_hash": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "attestation_embedded_in_registration": {
+          "const": true
+        },
+        "release_expected_digest": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "quote_sha256": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "event_log_sha256": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "pcr_policy_hash": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "dkg_transcript_sha256": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "sealed_share_sha256": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        },
+        "attestation_payload_hash": {
+          "type": "string",
+          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "secret_files": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^/var/lib/protocore/.+"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "node": {
+            "properties": {
+              "role": {
+                "const": "operator-signing"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["operator", "cluster", "attestation", "secret_files"],
+        "properties": {
+          "operator": {
+            "required": ["address", "position", "index"]
+          },
+          "cluster": {
+            "required": [
+              "id",
+              "size",
+              "threshold",
+              "active_members",
+              "standby_members",
+              "dkg_epoch"
+            ]
+          },
+          "attestation": {
+            "required": ["tpm"],
+            "properties": {
+              "tpm": {
+                "required": [
+                  "mode",
+                  "pcr_bank",
+                  "pcr_values",
+                  "quote_file",
+                  "event_log_file",
+                  "quote_sha256",
+                  "event_log_sha256",
+                  "quote_nonce",
+                  "sealed_key_policy"
+                ]
+              }
+            }
+          },
+          "secret_files": {
+            "required": [
+              "operator_identity_key",
+              "bls_share",
+              "cluster_key_share",
+              "dkg_transcript",
+              "tpm_sealed_bls_share"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["attestation"],
+        "properties": {
+          "attestation": {
+            "required": ["tpm"],
+            "properties": {
+              "tpm": {
+                "required": ["mode"],
+                "properties": {
+                  "mode": {
+                    "const": "hardware-tpm2"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "attestation": {
+            "properties": {
+              "tpm": {
+                "required": ["quote_verification"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": ["node"],
+        "properties": {
+          "node": {
+            "required": ["role", "chain_profile"],
+            "properties": {
+              "role": {
+                "const": "operator-signing"
+              },
+              "chain_profile": {
+                "const": "mainnet"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": ["on_chain_registration"],
+        "properties": {
+          "on_chain_registration": {
+            "required": [
+              "registry_contract",
+              "operator_address",
+              "cluster_id",
+              "operator_index",
+              "registration_tx_hash",
+              "dag_round",
+              "quorum_certificate_hash",
+              "registration_method",
+              "registration_function_selector",
+              "registration_calldata_hash",
+              "attestation_embedded_in_registration",
+              "release_expected_digest",
+              "quote_sha256",
+              "event_log_sha256",
+              "pcr_policy_hash",
+              "dkg_transcript_sha256",
+              "sealed_share_sha256",
+              "attestation_payload_hash"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

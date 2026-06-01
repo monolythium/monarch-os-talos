@@ -12,6 +12,154 @@ static const char *env_or_default(const char *name, const char *fallback) {
     return value && value[0] ? value : fallback;
 }
 
+static int is_truthy(const char *value) {
+    return value && (strcmp(value, "true") == 0 || strcmp(value, "1") == 0 ||
+                     strcmp(value, "yes") == 0 || strcmp(value, "on") == 0);
+}
+
+static int contains_case_insensitive(const char *haystack, const char *needle) {
+    size_t needle_len = strlen(needle);
+
+    if (needle_len == 0) {
+        return 1;
+    }
+
+    for (const char *p = haystack; *p; ++p) {
+        size_t i = 0;
+        while (i < needle_len && p[i]) {
+            char a = p[i];
+            char b = needle[i];
+            if (a >= 'A' && a <= 'Z') {
+                a = (char)(a - 'A' + 'a');
+            }
+            if (b >= 'A' && b <= 'Z') {
+                b = (char)(b - 'A' + 'a');
+            }
+            if (a != b) {
+                break;
+            }
+            ++i;
+        }
+        if (i == needle_len) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int is_placeholder_value(const char *value) {
+    return value &&
+           (strchr(value, '<') || contains_case_insensitive(value, "replace-with") ||
+            contains_case_insensitive(value, "changeme") ||
+            contains_case_insensitive(value, "placeholder") ||
+            contains_case_insensitive(value, "example-secret"));
+}
+
+static int validate_hex_digest(const char *value) {
+    size_t len = strlen(value);
+
+    if (len != 64) {
+        return -1;
+    }
+
+    for (size_t i = 0; i < len; ++i) {
+        char c = value[i];
+        if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') ||
+              (c >= 'A' && c <= 'F'))) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int require_readable_file(const char *path, const char *label) {
+    if (!path || !path[0]) {
+        fprintf(stderr, "%s path is required\n", label);
+        return -1;
+    }
+    if (is_placeholder_value(path)) {
+        fprintf(stderr, "%s path is still a placeholder\n", label);
+        return -1;
+    }
+    if (access(path, R_OK) != 0) {
+        fprintf(stderr, "%s is not readable: %s\n", label, path);
+        return -1;
+    }
+    return 0;
+}
+
+static int reject_placeholder_env(const char *name) {
+    const char *value = getenv(name);
+
+    if (value && value[0] && is_placeholder_value(value)) {
+        fprintf(stderr, "%s is still a placeholder; refusing to start\n", name);
+        return -1;
+    }
+    return 0;
+}
+
+static int reject_inline_secret_envs(void) {
+    const char *forbidden[] = {
+        "PROTOCORE_KEYSTORE_PASSPHRASE",
+        "PROTOCORE_OPERATOR_MNEMONIC",
+        "PROTOCORE_OPERATOR_PRIVATE_KEY",
+        "PROTOCORE_BLS_SHARE",
+        "PROTOCORE_CLUSTER_KEY_SHARE",
+        "PROTOCORE_KEY_SHARE",
+        NULL,
+    };
+
+    for (const char **name = forbidden; *name; ++name) {
+        const char *value = getenv(*name);
+        if (value && value[0]) {
+            fprintf(stderr, "%s is inline secret material; use the enrollment/secret file path instead\n", *name);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
+static int read_file_trimmed(const char *path, char *buf, size_t buf_len, const char *label) {
+    if (require_readable_file(path, label) != 0) {
+        return -1;
+    }
+
+    FILE *in = fopen(path, "rb");
+    if (!in) {
+        perror("fopen secret file");
+        return -1;
+    }
+
+    size_t n = fread(buf, 1, buf_len - 1, in);
+    if (ferror(in)) {
+        perror("fread secret file");
+        fclose(in);
+        return -1;
+    }
+    if (!feof(in)) {
+        fprintf(stderr, "%s is too large\n", label);
+        fclose(in);
+        return -1;
+    }
+    fclose(in);
+
+    buf[n] = '\0';
+    while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r' ||
+                     buf[n - 1] == ' ' || buf[n - 1] == '\t')) {
+        buf[--n] = '\0';
+    }
+
+    if (is_placeholder_value(buf)) {
+        fprintf(stderr, "%s contains placeholder content\n", label);
+        return -1;
+    }
+
+    return 0;
+}
+
 static int mkdir_p(const char *path) {
     char tmp[512];
     size_t len = strlen(path);
@@ -95,6 +243,94 @@ static int verify_protocore_release(void) {
     };
 
     return run_and_wait(verify_argv, "protocore release verify");
+}
+
+static int verify_provisioning_policy(void) {
+    const char *expected_digest = getenv("PROTOCORE_EXPECTED_DIGEST");
+    const char *expected_digest_file = getenv("PROTOCORE_EXPECTED_DIGEST_FILE");
+    const char *enrollment_file = env_or_default("PROTOCORE_ENROLLMENT_FILE", "/var/lib/protocore/enrollment/enrollment.json");
+    const char *require_enrollment = env_or_default("PROTOCORE_REQUIRE_ENROLLMENT", "false");
+    const char *require_tpm_binding = env_or_default("PROTOCORE_REQUIRE_TPM_BINDING", "false");
+    const char *tpm_quote_file = getenv("PROTOCORE_TPM_QUOTE_FILE");
+    const char *tpm_event_log_file = getenv("PROTOCORE_TPM_EVENT_LOG_FILE");
+    const char *tpm_sealed_bls_share_file = getenv("PROTOCORE_TPM_SEALED_BLS_SHARE_FILE");
+    const char *dkg_transcript_file = getenv("PROTOCORE_DKG_TRANSCRIPT_FILE");
+    const char *postgres_url = getenv("PROTOCORE_INDEXER_POSTGRES_URL");
+    const char *postgres_url_file = getenv("PROTOCORE_INDEXER_POSTGRES_URL_FILE");
+
+    if (reject_inline_secret_envs() != 0) {
+        return -1;
+    }
+
+    const char *placeholder_checked[] = {
+        "PROTOCORE_EXPECTED_DIGEST",
+        "PROTOCORE_EXPECTED_DIGEST_FILE",
+        "PROTOCORE_ENROLLMENT_FILE",
+        "PROTOCORE_CHAIN_ID",
+        "PROTOCORE_P2P_LISTEN",
+        "PROTOCORE_RPC_LISTEN",
+        "PROTOCORE_DISCOVERY",
+        "PROTOCORE_GENESIS_TOML",
+        "PROTOCORE_INDEXER_POSTGRES_URL",
+        "PROTOCORE_INDEXER_POSTGRES_URL_FILE",
+        "PROTOCORE_TPM_QUOTE_FILE",
+        "PROTOCORE_TPM_EVENT_LOG_FILE",
+        "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE",
+        "PROTOCORE_DKG_TRANSCRIPT_FILE",
+        NULL,
+    };
+    for (const char **name = placeholder_checked; *name; ++name) {
+        if (reject_placeholder_env(*name) != 0) {
+            return -1;
+        }
+    }
+
+    if (expected_digest && expected_digest[0] && validate_hex_digest(expected_digest) != 0) {
+        fprintf(stderr, "PROTOCORE_EXPECTED_DIGEST must be a 64-character SHA-256 hex digest\n");
+        return -1;
+    }
+    if (expected_digest_file && expected_digest_file[0] &&
+        require_readable_file(expected_digest_file, "PROTOCORE_EXPECTED_DIGEST_FILE") != 0) {
+        return -1;
+    }
+
+    if (postgres_url && postgres_url[0] && postgres_url_file && postgres_url_file[0]) {
+        fprintf(stderr, "set only one of PROTOCORE_INDEXER_POSTGRES_URL or PROTOCORE_INDEXER_POSTGRES_URL_FILE\n");
+        return -1;
+    }
+    if (postgres_url && postgres_url[0] && strchr(postgres_url, '@')) {
+        fprintf(stderr, "PROTOCORE_INDEXER_POSTGRES_URL appears to contain credentials; use PROTOCORE_INDEXER_POSTGRES_URL_FILE\n");
+        return -1;
+    }
+    if (postgres_url_file && postgres_url_file[0] &&
+        require_readable_file(postgres_url_file, "PROTOCORE_INDEXER_POSTGRES_URL_FILE") != 0) {
+        return -1;
+    }
+
+    if (is_truthy(require_enrollment)) {
+        if (require_readable_file(enrollment_file, "PROTOCORE_ENROLLMENT_FILE") != 0) {
+            return -1;
+        }
+        if (!(expected_digest && expected_digest[0]) &&
+            !(expected_digest_file && expected_digest_file[0])) {
+            fprintf(stderr, "PROTOCORE_REQUIRE_ENROLLMENT requires a release digest or digest file\n");
+            return -1;
+        }
+    }
+    if (is_truthy(require_tpm_binding)) {
+        if (require_readable_file(tpm_quote_file, "PROTOCORE_TPM_QUOTE_FILE") != 0 ||
+            require_readable_file(tpm_event_log_file, "PROTOCORE_TPM_EVENT_LOG_FILE") != 0 ||
+            require_readable_file(tpm_sealed_bls_share_file, "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE") != 0 ||
+            require_readable_file(dkg_transcript_file, "PROTOCORE_DKG_TRANSCRIPT_FILE") != 0) {
+            return -1;
+        }
+        if (!is_truthy(require_enrollment)) {
+            fprintf(stderr, "PROTOCORE_REQUIRE_TPM_BINDING requires PROTOCORE_REQUIRE_ENROLLMENT=true\n");
+            return -1;
+        }
+    }
+
+    return 0;
 }
 
 static int copy_file(const char *src, const char *dst) {
@@ -205,6 +441,17 @@ static int write_first_boot_config(const char *path) {
     const char *discovery = env_or_default("PROTOCORE_DISCOVERY", "hybrid");
     const char *rpc_listen = env_or_default("PROTOCORE_RPC_LISTEN", "0.0.0.0:8545");
     const char *postgres_url = getenv("PROTOCORE_INDEXER_POSTGRES_URL");
+    const char *postgres_url_file = getenv("PROTOCORE_INDEXER_POSTGRES_URL_FILE");
+    char postgres_url_buf[4096];
+
+    if ((!postgres_url || !postgres_url[0]) && postgres_url_file && postgres_url_file[0]) {
+        if (read_file_trimmed(postgres_url_file, postgres_url_buf, sizeof(postgres_url_buf),
+                              "PROTOCORE_INDEXER_POSTGRES_URL_FILE") != 0) {
+            return -1;
+        }
+        postgres_url = postgres_url_buf;
+    }
+
     int indexer_postgres = postgres_url && postgres_url[0];
 
     FILE *out = fopen(path, "wb");
@@ -275,6 +522,9 @@ int main(void) {
     snprintf(config_path, sizeof(config_path), "%s/config.toml", home);
     snprintf(genesis_path, sizeof(genesis_path), "%s/genesis.toml", home);
 
+    if (verify_provisioning_policy() != 0) {
+        return 1;
+    }
     if (verify_protocore_release() != 0) {
         return 1;
     }

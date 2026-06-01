@@ -43,7 +43,17 @@ The OS image intentionally ships without:
    examples/protocore-extension-service-config.yaml
    ```
 
-   Replace the placeholder passphrase and any network-specific values through the private provisioning flow. Do not commit real secrets.
+   The example uses file paths for enrollment material and release digests. Do not put passphrases, mnemonics, private keys, or key shares directly in `environment:`. The `protocore-entrypoint` rejects known inline secret env vars and placeholder values at start; `make verify-artifacts REQUIRE_PROVISIONING_POLICY=true` checks the shipped service config does the same.
+
+   Validate enrollment manifests before copying them to the node:
+
+   ```bash
+   make validate-enrollment-manifest \
+     ENROLLMENT_MANIFEST=./enrollment.json \
+     EXPECTED_CHAIN_PROFILE=testnet \
+     EXPECTED_CHAIN_ID=69420 \
+     REQUIRE_RELEASE_DIGEST=true
+   ```
 
 5. Apply the machine config.
 
@@ -86,18 +96,24 @@ Implemented in this repository:
 
 - local ISO build
 - local preinstalled raw image build
+- QEMU smoke path for raw image boot, generated Talos smoke config apply, `ext-protocore` service check, testnet-required Protocore RPC probe, and runtime substrate proof captured through `talosctl read`, including a no-SSH-listener check on TCP port 22
 - `monarch-protocore` Talos system extension
 - `protocore` service entrypoint
 - baked testnet genesis staging
 - service gating on `ExtensionServiceConfig`
+- fail-closed runtime checks for placeholder values, inline secret env vars, optional enrollment manifest, and release digest inputs
+- versioned enrollment manifest schema plus local validator
+- release-metadata-derived nftables/JSON firewall policy rendering for Talos API, Protocore RPC, and Protocore P2P exposure, plus dry-run-first Hetzner Cloud firewall application through `make hcloud-firewall-policy`
+- provider-specific dry-run firewall plans for DigitalOcean, AWS, GCP, and Vultr through `make cloud-firewall-policy`
+- signed Talos CA/client certificate rotation manifests with canonical payload-hash approval binding and optional Desktop post-rotation e2e evidence
 
 Still required before a production operator release:
 
-- signed artifact publishing
-- provenance/SBOM release workflow
-- bundled/native Talos API client hardening in Monarch Desktop
-- secret injection through the final provisioning flow
-- production network policy for RPC/P2P exposure
-- replacement of testnet genesis with release-channel genesis artifacts
+- final key-share rotation, recovery, and audit ceremonies through the enrollment flow
+- final production Talos certificate issuance automation; rotation manifests and Desktop evidence gates are now checked locally
+- mainnet genesis/operator roster publication before any mainnet channel is enabled
 
-See [Final product readiness](./final-product-readiness.md) for the full gap list and build plan.
+See [Operator runbooks](./operator-runbooks.md) for the current verify, install,
+enroll, operate, upgrade, recover, rotate, and incident-response workflow. See
+[Final product readiness](./final-product-readiness.md) for the full gap list and
+build plan.

@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monolythium.com/schemas/talos-certificate-rotation.schema.json",
+  "title": "Monarch Talos Certificate Rotation",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "chain",
+    "rotation",
+    "node",
+    "current_identity",
+    "next_identity",
+    "talosconfig",
+    "approvals"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "monarch-talos-certificate-rotation/v1"
+    },
+    "chain": {
+      "type": "object",
+      "required": ["profile", "chain_id"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chain_id": {
+          "type": ["string", "integer"],
+          "pattern": "^[0-9]+$"
+        }
+      }
+    },
+    "rotation": {
+      "type": "object",
+      "required": ["id", "type", "reason", "runbook_id", "opened_at", "approval_threshold"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": ["client-cert-renewal", "ca-rotation", "endpoint-change", "emergency-rekey"]
+        },
+        "reason": {
+          "enum": ["scheduled", "certificate-expiry", "talos-ca-mismatch", "node-endpoint-change", "compromise", "lost-talosconfig"]
+        },
+        "runbook_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "opened_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "approval_threshold": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "node": {
+      "type": "object",
+      "required": ["node_id", "role", "current_endpoint", "next_endpoint"],
+      "additionalProperties": false,
+      "properties": {
+        "node_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": ["operator-signing", "archive", "rpc", "bridge", "full"]
+        },
+        "cluster_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_endpoint": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next_endpoint": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "current_identity": {
+      "$ref": "#/$defs/talos_identity"
+    },
+    "next_identity": {
+      "$ref": "#/$defs/talos_identity"
+    },
+    "talosconfig": {
+      "type": "object",
+      "required": ["current_path", "current_sha256", "next_path", "next_sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "current_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "current_sha256": {
+          "$ref": "#/$defs/hash32"
+        },
+        "next_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "next_sha256": {
+          "$ref": "#/$defs/hash32"
+        }
+      }
+    },
+    "post_rotation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "desktop_e2e_evidence": {
+          "type": "object",
+          "required": [
+            "schema_version",
+            "sha256",
+            "talos_ca_fingerprint_sha256",
+            "talos_endpoint",
+            "ca_pin_status",
+            "expires_min_days"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "schema_version": {
+              "const": "monarch-desktop-e2e-evidence/v1"
+            },
+            "sha256": {
+              "$ref": "#/$defs/hash32"
+            },
+            "talos_ca_fingerprint_sha256": {
+              "$ref": "#/$defs/hash32"
+            },
+            "talos_endpoint": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ca_pin_status": {
+              "enum": ["matched", "trusted"]
+            },
+            "expires_min_days": {
+              "type": "integer",
+              "minimum": 14
+            }
+          }
+        }
+      }
+    },
+    "approvals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["address", "signature_scheme", "signed_payload_hash", "signature"],
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "signature_scheme": {
+            "const": "ML-DSA-65"
+          },
+          "signed_payload_hash": {
+            "$ref": "#/$defs/hash32"
+          },
+          "signature": {
+            "type": "string",
+            "pattern": "^(0x[0-9a-fA-F]{128,}|[A-Za-z0-9+/=]{128,})$"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hash32": {
+      "type": "string",
+      "pattern": "^(0x)?[0-9a-fA-F]{64}$"
+    },
+    "talos_identity": {
+      "type": "object",
+      "required": [
+        "ca_fingerprint_sha256",
+        "client_fingerprint_sha256",
+        "ca_not_after",
+        "client_not_after"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "ca_fingerprint_sha256": {
+          "$ref": "#/$defs/hash32"
+        },
+        "client_fingerprint_sha256": {
+          "$ref": "#/$defs/hash32"
+        },
+        "ca_not_after": {
+          "type": "string",
+          "minLength": 1
+        },
+        "client_not_after": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

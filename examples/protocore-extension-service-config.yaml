@@ -5,7 +5,15 @@ environment:
   # Inject through a secure release/provisioning flow. Do not commit real values.
   # Optional fail-closed binary attestation. Use either this digest or
   # PROTOCORE_EXPECTED_DIGEST_FILE, never both.
-  - PROTOCORE_EXPECTED_DIGEST=<replace-with-release-sha256>
-  - PROTOCORE_KEYSTORE_PASSPHRASE=<replace-with-operator-keystore-passphrase>
+  - PROTOCORE_EXPECTED_DIGEST_FILE=/var/lib/protocore/enrollment/protocore.sha256
+  - PROTOCORE_REQUIRE_ENROLLMENT=true
+  - PROTOCORE_ENROLLMENT_FILE=/var/lib/protocore/enrollment/enrollment.json
+  # Enable for operator-signing nodes once the enrollment bundle includes
+  # TPM quote/event-log evidence, a TPM-sealed BLS share, and the DKG transcript.
+  - PROTOCORE_REQUIRE_TPM_BINDING=false
+  # - PROTOCORE_TPM_QUOTE_FILE=/var/lib/protocore/attestation/quote.bin
+  # - PROTOCORE_TPM_EVENT_LOG_FILE=/var/lib/protocore/attestation/eventlog.bin
+  # - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/secrets/bls-share.sealed
+  # - PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/dkg-transcript.json
   - PROTOCORE_P2P_LISTEN=/ip4/0.0.0.0/tcp/29898
   - PROTOCORE_DISCOVERY=hybrid

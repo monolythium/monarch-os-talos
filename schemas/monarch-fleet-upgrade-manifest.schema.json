@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://monolythium.com/schemas/monarch-fleet-upgrade-manifest.schema.json",
+  "title": "Monarch Talos Fleet Upgrade Manifest",
+  "type": "object",
+  "required": ["schema_version", "fleet", "nodes"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "monarch-talos-fleet-upgrade-manifest/v1"
+    },
+    "fleet": {
+      "type": "object",
+      "required": ["id", "max_unavailable"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_unavailable": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "canary_count": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1
+        },
+        "operator_signing_quorum": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 7
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["node_id", "role", "talos_node", "talos_endpoint"],
+        "additionalProperties": false,
+        "properties": {
+          "node_id": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S+$"
+          },
+          "role": {
+            "enum": ["operator-signing", "archive", "rpc", "bridge", "full"]
+          },
+          "cluster_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "operator_index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9
+          },
+          "cluster_position": {
+            "enum": ["active", "standby"]
+          },
+          "talos_node": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S+$"
+          },
+          "talos_endpoint": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^\\S+$"
+          },
+          "talosconfig": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "role": {
+                  "const": "operator-signing"
+                }
+              },
+              "required": ["role"]
+            },
+            "then": {
+              "required": ["cluster_id", "operator_index", "cluster_position"]
+            }
+          }
+        ]
+      }
+    },
+    "waves": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["node_ids"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": ["canary", "rolling", "maintenance"]
+          },
+          "node_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  }
+}

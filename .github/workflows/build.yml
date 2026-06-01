@@ -24,11 +24,64 @@ on:
         required: false
         default: "protocore-v0.0.16-testnet-x86_64-linux.tar.gz"
         type: string
+      release_channel:
+        description: "Release channel encoded into artifact metadata"
+        required: false
+        default: "testnet"
+        type: choice
+        options:
+          - dev
+          - testnet
+          - mainnet
+      chain_profile:
+        description: "Protocore network profile baked into the extension"
+        required: false
+        default: "testnet"
+        type: string
+      chain_id:
+        description: "EVM chain id baked into the extension"
+        required: false
+        default: "69420"
+        type: string
+      genesis_toml:
+        description: "Genesis TOML staged into the extension and hashed in metadata"
+        required: false
+        default: "defaults/testnet/genesis.toml"
+        type: string
+      monarch_desktop_min_version:
+        description: "Minimum compatible Monarch Desktop version"
+        required: false
+        default: "0.0.5"
+        type: string
+      monarch_desktop_max_version:
+        description: "Maximum compatible Monarch Desktop version"
+        required: false
+        default: "<1.0.0"
+        type: string
+      desktop_e2e_release_tag:
+        description: "Monarch Desktop release tag containing monarch-desktop-e2e-evidence.json. Required for testnet/mainnet promotion unless artifact_run_id/url is supplied."
+        required: false
+        type: string
+      desktop_e2e_artifact_run_id:
+        description: "Monarch Desktop workflow run id containing the monarch-desktop-e2e-evidence artifact."
+        required: false
+        type: string
+      desktop_e2e_artifact_name:
+        description: "Monarch Desktop workflow artifact name for Desktop e2e evidence."
+        required: false
+        default: "monarch-desktop-e2e-evidence"
+        type: string
+      desktop_e2e_evidence_url:
+        description: "Direct URL to monarch-desktop-e2e-evidence/v1 JSON."
+        required: false
+        type: string
 
 permissions:
   contents: write
   id-token: write   # required for cosign keyless via GitHub OIDC
   packages: write   # for pushing extension OCI to ghcr.io
+  attestations: write
+  artifact-metadata: write
 
 jobs:
   build:
@@ -41,6 +94,21 @@ jobs:
 
       - name: Install syft
         uses: anchore/sbom-action/download-syft@v0
+
+      - name: Install QEMU
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends qemu-system-x86 curl
+
+      - name: Install talosctl
+        env:
+          TALOS_VERSION: v1.13.0
+        run: |
+          sudo curl -fsSL \
+            -o /usr/local/bin/talosctl \
+            "https://github.com/siderolabs/talos/releases/download/${TALOS_VERSION}/talosctl-linux-amd64"
+          sudo chmod +x /usr/local/bin/talosctl
+          talosctl version --client --short
 
       - uses: docker/setup-buildx-action@v3
 
@@ -84,8 +152,42 @@ jobs:
           echo "PROTOCORE_SOURCE=github.com/monolythium/protocore@$PROTOCORE_TAG/$PROTOCORE_ASSET" >> "$GITHUB_ENV"
 
       - name: Build artifacts
+        env:
+          RELEASE_CHANNEL: ${{ github.event.inputs.release_channel || 'testnet' }}
+          CHAIN_PROFILE: ${{ github.event.inputs.chain_profile || 'testnet' }}
+          CHAIN_ID: ${{ github.event.inputs.chain_id || '69420' }}
+          GENESIS_TOML: ${{ github.event.inputs.genesis_toml || 'defaults/testnet/genesis.toml' }}
+          MONARCH_DESKTOP_CHANNEL: ${{ github.event.inputs.release_channel || 'testnet' }}
+          MONARCH_DESKTOP_MIN_VERSION: ${{ github.event.inputs.monarch_desktop_min_version || '0.0.5' }}
+          MONARCH_DESKTOP_MAX_VERSION: ${{ github.event.inputs.monarch_desktop_max_version || '<1.0.0' }}
+          UPGRADE_REQUIRES_SAME_CHANNEL: "true"
+          PROTOCORE_P2P_LISTEN: "/ip4/0.0.0.0/tcp/29898"
+          PROTOCORE_RPC_LISTEN: "0.0.0.0:8545"
+          PROTOCORE_DISCOVERY: "hybrid"
+          PROTOCORE_REQUIRE_ENROLLMENT: "true"
+          PROTOCORE_ENROLLMENT_FILE: "/var/lib/protocore/enrollment/enrollment.json"
+          PROTOCORE_EXPECTED_DIGEST_FILE: "/var/lib/protocore/enrollment/protocore.sha256"
+          PROTOCORE_REQUIRE_TPM_BINDING: "true"
+          PROTOCORE_TPM_QUOTE_FILE: "/var/lib/protocore/attestation/quote.bin"
+          PROTOCORE_TPM_EVENT_LOG_FILE: "/var/lib/protocore/attestation/eventlog.bin"
+          PROTOCORE_TPM_SEALED_BLS_SHARE_FILE: "/var/lib/protocore/secrets/bls-share.sealed"
+          PROTOCORE_DKG_TRANSCRIPT_FILE: "/var/lib/protocore/secrets/dkg-transcript.json"
         run: |
-          GENESIS_TOML=defaults/testnet/genesis.toml make iso metal metadata sbom
+          make iso metal sbom
+          make smoke-qemu-config
+          REQUIRE_TALOS_API_PROBE=true \
+            TIMEOUT_SECONDS=180 \
+            BOOT_HOLD_SECONDS=45 \
+            POST_APPLY_TIMEOUT_SECONDS=240 \
+            EXTENSION_SERVICE_TIMEOUT_SECONDS=180 \
+            TALOS_MACHINE_CONFIG_FILE="_out/smoke-qemu-config/controlplane.yaml" \
+            TALOSCONFIG_FILE="_out/smoke-qemu-config/talosconfig" \
+            REQUIRE_EXTENSION_SERVICE_CHECK=true \
+            REQUIRE_PROTOCORE_RPC_PROBE=true \
+            REQUIRE_ENROLLMENT_RUNTIME_PROOF=true \
+            REQUIRE_TPM_BINDING_RUNTIME_PROOF=true \
+            REQUIRE_SUBSTRATE_RUNTIME_PROOF=true \
+            make smoke-qemu-artifact
           # Compress the raw disk image. Talos raw is ~4GB provisioned but mostly
           # empty, so xz drops it to a few hundred MB — keeps it under the GitHub
           # release asset limit and is directly consumable by hcloud-upload-image
@@ -97,17 +199,114 @@ jobs:
           for xz in _out/*.raw.xz; do
             (cd "$(dirname "$xz")" && sha256sum "$(basename "$xz")" > "$(basename "$xz").sha256")
           done
+          if hashes="$(FORMAT=csv ./scripts/extract-dm-verity-root-hashes.sh _out/smoke-qemu/substrate-runtime.json)"; then
+            export DM_VERITY_EXPECTED_ROOT_HASHES="$hashes"
+            echo "DM_VERITY_EXPECTED_ROOT_HASHES=$hashes" >> "$GITHUB_ENV"
+          else
+            echo "No active dm-verity root hashes extracted from smoke; required channels will fail artifact verification."
+          fi
+          make metadata
+          make extension-rebuild-witness
 
       - name: Sign artifacts (cosign keyless)
-        if: hashFiles('_out/*.iso') != '' || hashFiles('_out/*.tar') != '' || hashFiles('_out/*.raw.xz') != ''
+        if: hashFiles('_out/*.iso') != '' || hashFiles('_out/*.tar') != '' || hashFiles('_out/*.raw.xz') != '' || hashFiles('_out/*.release.json') != '' || hashFiles('_out/*.spdx.json') != '' || hashFiles('_out/*.rebuild-witness.json') != ''
         env:
           COSIGN_EXPERIMENTAL: "1"
         run: |
           shopt -s nullglob
-          for f in _out/*.iso _out/*.tar _out/*.raw.xz; do
+          for f in _out/*.iso _out/*.tar _out/*.raw.xz _out/*.release.json _out/*.spdx.json _out/*.rebuild-witness.json; do
             echo "Signing $f"
             cosign sign-blob --yes "$f" --output-signature "$f.sig" --output-certificate "$f.pem"
           done
+
+      - name: Generate build provenance attestations
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            _out/*.iso
+            _out/*.raw.xz
+            _out/*.tar
+            _out/*.release.json
+            _out/*.spdx.json
+            _out/*.rebuild-witness.json
+
+      - name: Verify release artifact set
+        run: REQUIRE_SIGNATURES=true REQUIRE_SMOKE_QEMU=true REQUIRE_SMOKE_QEMU_TALOSCTL=true REQUIRE_SMOKE_QEMU_CONFIG_APPLY=true REQUIRE_SMOKE_QEMU_SERVICE=true REQUIRE_SMOKE_QEMU_RPC=true REQUIRE_ENROLLMENT_RUNTIME_PROOF=true REQUIRE_TPM_BINDING_RUNTIME_PROOF=true REQUIRE_SUBSTRATE_RUNTIME_PROOF=true REQUIRE_CHANNEL_METADATA=true REQUIRE_COMPLETE_ARTIFACT_SET=true REQUIRE_SUBSTRATE_PROOF=true REQUIRE_NETWORK_POLICY=true REQUIRE_PROVISIONING_POLICY=true REQUIRE_INCIDENT_RESPONSE_POLICY=true REQUIRE_DISASTER_RECOVERY_POLICY=true make verify-artifacts
+
+      - name: Verify Hetzner firewall policy translation
+        run: |
+          set -euo pipefail
+          make hcloud-firewall-policy \
+            NETWORK_POLICY_METADATA="_out/monarch-os-talos-v1.13.0-amd64.release.json" \
+            TALOS_ALLOWED_CIDRS="10.10.0.0/16" \
+            RPC_ALLOWED_CIDRS="10.20.0.0/16" \
+            P2P_ALLOWED_CIDRS="0.0.0.0/0,::/0" \
+            HCLOUD_FIREWALL_RULES_OUTPUT="_out/monarch-hcloud-firewall-rules.json"
+          jq -e '
+            length == 3
+            and .[0].direction == "in"
+            and .[0].protocol == "tcp"
+            and .[0].port == "50000"
+            and .[0].source_ips == ["10.10.0.0/16"]
+            and .[1].port == "8545"
+            and .[1].source_ips == ["10.20.0.0/16"]
+            and .[2].port == "29898"
+            and .[2].source_ips == ["0.0.0.0/0", "::/0"]
+          ' _out/monarch-hcloud-firewall-rules.json >/dev/null
+
+      - name: Verify multi-cloud firewall policy translation
+        run: |
+          set -euo pipefail
+          make cloud-firewall-policy \
+            NETWORK_POLICY_METADATA="_out/monarch-os-talos-v1.13.0-amd64.release.json" \
+            TALOS_ALLOWED_CIDRS="10.10.0.0/16" \
+            RPC_ALLOWED_CIDRS="10.20.0.0/16" \
+            P2P_ALLOWED_CIDRS="0.0.0.0/0,::/0" \
+            CLOUD_FIREWALL_OUTPUT="_out/monarch-cloud-firewall-plan.json"
+          jq -e '
+            .schema_version == "monarch-cloud-firewall-plan/v1"
+            and (.plans | keys | sort) == ["aws", "digitalocean", "gcp", "vultr"]
+            and .plans.aws.ingress_permissions[0].FromPort == 50000
+            and .plans.digitalocean.inbound_rules[1].ports == "8545"
+            and .plans.gcp.firewall_rules[2].allowed[0].ports == ["29898"]
+            and (.plans.vultr.rules[] | select(.port == "29898" and .ip_type == "v6"))
+          ' _out/monarch-cloud-firewall-plan.json >/dev/null
+
+      - name: Verify upgrade plan generation
+        run: make test-upgrade-plan
+
+      - name: Verify fleet upgrade orchestration
+        run: make test-fleet-upgrade-plan
+
+      - name: Verify Talos certificate rotation
+        run: make test-talos-certificate-rotation
+
+      - name: Verify incident response executor bindings
+        run: make test-incident-response
+
+      - name: Verify stopped/offline backup packaging
+        run: make test-protocore-offline-backup
+
+      - name: Resolve Desktop e2e evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PROMOTION_METADATA: _out/monarch-os-talos-v1.13.0-amd64.release.json
+          DESKTOP_E2E_REPO: monolythium/monarch-desktop
+          DESKTOP_E2E_RELEASE_TAG: ${{ github.event.inputs.desktop_e2e_release_tag || vars.MONARCH_DESKTOP_E2E_RELEASE_TAG || '' }}
+          DESKTOP_E2E_ARTIFACT_RUN_ID: ${{ github.event.inputs.desktop_e2e_artifact_run_id || vars.MONARCH_DESKTOP_E2E_ARTIFACT_RUN_ID || '' }}
+          DESKTOP_E2E_ARTIFACT_NAME: ${{ github.event.inputs.desktop_e2e_artifact_name || 'monarch-desktop-e2e-evidence' }}
+          DESKTOP_E2E_EVIDENCE_URL: ${{ github.event.inputs.desktop_e2e_evidence_url || vars.MONARCH_DESKTOP_E2E_EVIDENCE_URL || '' }}
+        run: |
+          set -euo pipefail
+          evidence="$(./scripts/resolve-desktop-e2e-evidence.sh)"
+          if [ -n "$evidence" ]; then
+            echo "DESKTOP_E2E_EVIDENCE=$evidence" >> "$GITHUB_ENV"
+          fi
+
+      - name: Check channel promotion policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: make check-channel-promotion PROMOTION_METADATA="_out/monarch-os-talos-v1.13.0-amd64.release.json"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -127,7 +326,21 @@ jobs:
             _out/*.tar.pem
             _out/*.release.json
             _out/*.release.json.sha256
+            _out/*.release.json.sig
+            _out/*.release.json.pem
             _out/*.spdx.json
+            _out/*.spdx.json.sha256
+            _out/*.spdx.json.sig
+            _out/*.spdx.json.pem
+            _out/*.rebuild-witness.json
+            _out/*.rebuild-witness.json.sha256
+            _out/*.rebuild-witness.json.sig
+            _out/*.rebuild-witness.json.pem
+            _out/attestations/*.jsonl
+            _out/desktop-e2e-evidence/*.json
+            _out/smoke-qemu/*.json
+            _out/smoke-qemu/*.log
+            _out/smoke-qemu/*.txt
 
   release:
     needs: build
@@ -157,6 +370,20 @@ jobs:
             _out/*.tar.pem
             _out/*.release.json
             _out/*.release.json.sha256
+            _out/*.release.json.sig
+            _out/*.release.json.pem
             _out/*.spdx.json
+            _out/*.spdx.json.sha256
+            _out/*.spdx.json.sig
+            _out/*.spdx.json.pem
+            _out/*.rebuild-witness.json
+            _out/*.rebuild-witness.json.sha256
+            _out/*.rebuild-witness.json.sig
+            _out/*.rebuild-witness.json.pem
+            _out/attestations/*.jsonl
+            _out/desktop-e2e-evidence/*.json
+            _out/smoke-qemu/*.json
+            _out/smoke-qemu/*.log
+            _out/smoke-qemu/*.txt
           draft: true
           fail_on_unmatched_files: false

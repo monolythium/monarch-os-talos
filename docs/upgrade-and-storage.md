@@ -26,8 +26,11 @@ A running node is made of two clearly separated layers:
    manager, no shell, and no way to edit system files in place. The root filesystem
    is verified on every boot with **dm-verity** (a kernel feature that
    cryptographically checks the disk blocks against a signed hash tree, so any
-   tampering is detected before the system runs). You replace this layer wholesale
-   when you upgrade; you never patch it.
+   tampering is detected before the system runs). Configured QEMU smoke records
+   read-only root evidence and, when the booted image exposes it, the active
+   dm-verity root hash. Channels that require active dm-verity also require the
+   runtime root hash to match the hash pinned in release metadata. You replace
+   this layer wholesale when you upgrade; you never patch it.
 
 2. **The data partition — writable and persistent.** Everything that must survive a
    reboot or an upgrade — the node's configuration, keys, and the entire blockchain
@@ -78,7 +81,64 @@ under **`/var/lib/protocore`** (see [extensions/protocore](../extensions/protoco
 ### 3. Upgrade (new image, same data)
 
 Upgrades **do not** mean re-flashing the ISO. When a new signed OS image is released,
-the operator runs:
+the operator first verifies the target artifact and compares the current and target
+release metadata:
+
+```bash
+make check-channel-promotion \
+  PROMOTION_METADATA=./target.release.json
+
+make check-upgrade-readiness \
+  UPGRADE_CURRENT_METADATA=./current.release.json \
+  UPGRADE_TARGET_METADATA=./target.release.json
+```
+
+Those checks are deliberately conservative. The channel-promotion check applies
+`channel-policy.json`, enforces the verifier flags required for the release channel,
+and currently blocks mainnet promotion by policy. The upgrade-readiness check then
+fails if the target changes release channel when same-channel upgrades are required,
+changes chain profile or chain id, changes genesis hash without
+`ALLOW_GENESIS_CHANGE=true`, lacks a concrete `protocore` version or Desktop
+compatibility range, drops the no-SSH/no-package-manager substrate policy, or lacks
+the raw image / `monarch-protocore` extension artifact in release metadata.
+
+After the preflight passes, the operator upgrades through the Talos API:
+
+```bash
+make upgrade-plan \
+  UPGRADE_CURRENT_METADATA=./current.release.json \
+  UPGRADE_TARGET_METADATA=./target.release.json \
+  UPGRADE_IMAGE_REF=ghcr.io/monolythium/monarch-os:<release-tag-or-digest> \
+  UPGRADE_PLAN_OUTPUT=./upgrade-plan.json
+```
+
+The plan is a local dry-run artifact: it binds the current and target metadata
+hashes, target raw/extension artifacts, Desktop upgrade payload, Talos Upgrade
+request (`preserve=true`, `force=false`), rollback path, and any required
+disaster-recovery manifest. It refuses mutable `latest` image refs and refuses
+migration/unsupported-rollback targets unless the operator supplies a validated
+DR manifest for that staged event.
+
+For multi-node rollouts, render a fleet plan from an explicit fleet manifest:
+
+```bash
+make fleet-upgrade-plan \
+  UPGRADE_CURRENT_METADATA=./current.release.json \
+  UPGRADE_TARGET_METADATA=./target.release.json \
+  FLEET_MANIFEST=./fleet-upgrade.json \
+  UPGRADE_IMAGE_REF=ghcr.io/monolythium/monarch-os:<release-tag-or-digest> \
+  FLEET_PLAN_OUTPUT=./fleet-upgrade-plan.json
+```
+
+The fleet manifest schema is `monarch-talos-fleet-upgrade-manifest/v1`. The
+renderer reuses the same release-readiness checks as the single-node plan,
+splits nodes into canary/rolling waves, writes per-node Talos/Desktop payloads,
+and rejects any wave that exceeds `fleet.max_unavailable`. For operator-signing
+nodes it also checks active signing capacity: by default, no wave may take enough
+active operators down to drop below `fleet.operator_signing_quorum` (normally 7).
+If a 7-active cluster has no spare active signing capacity, promote/rotate
+through the key-share lifecycle first rather than rolling an active signer below
+quorum.
 
 ```bash
 talosctl upgrade --nodes <node-ip> --image <new-signed-image-reference>
@@ -108,13 +168,53 @@ talosctl rollback --nodes <node-ip>
 The node boots back into the prior image. The data partition is, again, untouched —
 so rollback restores the previous OS without rewinding the chain data.
 
+Rollback is safe only when the previous `protocore` can read the current
+`/var/lib/protocore` database. If a release includes a one-way state migration, that
+release must say so in metadata and operator notes before promotion. Release
+metadata now carries an explicit state-migration policy under
+`channel.upgrade.state_migration`, plus rollback support under
+`channel.upgrade.rollback`. `make check-upgrade-readiness` blocks any target that
+declares a migration or unsupported rollback unless `ALLOW_STATE_MIGRATION=true`
+is set for a staged operator event. Migration releases must also name a runbook and
+require a backup, disaster-recovery manifest, and operator approval.
+
 ### 5. Disk replacement and recovery
 
-Replacing a failed disk or rebuilding a node is a re-install (step 1) followed by
-restoring node state, or re-syncing the chain from the network. The detailed
-restore/disaster-recovery procedure is intentionally not yet finalized — it is tracked
-in [`docs/final-product-readiness.md`](./final-product-readiness.md) under state
-backup/recovery.
+Replacing a failed disk or rebuilding a node is a re-install (step 1), then either:
+
+1. re-sync from the network using the same chain profile/genesis, or
+2. restore an operator-approved offline backup of `/var/lib/protocore` taken while the
+   service was stopped.
+
+There is no supported in-place hot backup command in the current preview. Do not copy
+`/var/lib/protocore` while `ext-protocore` is running and call that a disaster-recovery
+backup; it can capture an inconsistent database. For now, the honest recovery posture is:
+
+- archive nodes can rebuild by re-syncing from peers;
+- signing/operator nodes need the final first-boot enrollment and key-share lifecycle
+  before a production restore runbook is complete;
+- disk-image snapshots are acceptable only when the VM or bare-metal disk is quiesced,
+  the release digest is recorded, and the restore is verified against the same
+  chain/genesis metadata before the node rejoins a cluster.
+
+The local disaster-recovery manifest contract is now documented in
+[`docs/disaster-recovery.md`](./disaster-recovery.md). `make validate-disaster-recovery`
+fails hot backups, requires stopped/offline evidence for data restores, binds the
+manifest to chain/genesis/release digests, and requires key-share recovery evidence
+for signing-node reseals before a node rejoins a cluster. The final automated
+backup path now includes a local stopped/offline archive packager,
+`make protocore-offline-backup`, which refuses running service state and emits
+backup evidence for the signed DR manifest. `make protocore-offline-restore`
+then validates that backup manifest and archive hash, also accepts Desktop
+Talos Copy exports when signed release metadata is supplied, refuses hot/current
+running restore state, rejects unsafe archive entries, restores into a quiesced
+target directory, and emits restore evidence for the signed DR manifest. The
+chain-side `recoverOperatorNode(bytes32)` executor now exists in mono-core as a
+foundation-gated node-registry alias of `unjail(bytes32)`, and Monarch Desktop
+can submit it when a foundation recovery signer is installed in the OS keychain.
+The remaining production gap is the final foundation recovery runbook and live
+operations process tracked in [`docs/final-product-readiness.md`](./final-product-readiness.md)
+under state backup/recovery.
 
 ---
 
@@ -177,11 +277,19 @@ attestation is described in the [Monolythium whitepaper](https://monolythium.com
 
 The mechanism above is standard, well-tested Talos behaviour that Monarch OS inherits,
 so the *storage and upgrade model* is sound today. What is **not yet finished** is the
-operator-facing automation around it — signed upgrade channels, rollback criteria,
-data-migration/compatibility guards, and the backup/restore runbooks. Those gaps are
-listed openly in [`docs/final-product-readiness.md`](./final-product-readiness.md), and
-operator install / verify / upgrade / recover guides will be published at
-[docs.monolythium.com](https://docs.monolythium.com) when the first signed release ships.
+operator-facing automation around it — the final foundation recovery operations
+runbook and live execution of the generated rollout plan. The signed channel policy,
+migration-aware upgrade preflight, single-node dry-run upgrade plan, fleet
+rollout plan, stopped/offline backup packager, promotion check, and
+disaster-recovery manifest validator now exist, and mono-core now exposes the
+foundation-gated `recoverOperatorNode(bytes32)` node-registry executor. Monarch
+Desktop can submit that executor from a foundation recovery keychain entry; the
+remaining recovery gap is exercising and publishing the final foundation
+runbook. Those gaps are listed openly in
+[`docs/final-product-readiness.md`](./final-product-readiness.md).
+The current preview operator workflow is in
+[`docs/operator-runbooks.md`](./operator-runbooks.md); the final docs-site version
+will be published when the first non-preview signed release ships.
 
 ---
 
@@ -195,7 +303,9 @@ operator install / verify / upgrade / recover guides will be published at
 - **Immutable OS** — the operating system files cannot be modified after build; you
   replace the whole image to change it.
 - **dm-verity** — a Linux kernel feature that verifies the root filesystem against a
-  signed hash on every boot, so tampering is detected.
+  signed hash on every boot, so tampering is detected. Monarch release smoke records
+  dm-verity support and can gate promotion on active root-hash evidence that matches
+  release metadata.
 - **System extension** — a sealed add-on packaged inside the signed OS image. The node
   software (`protocore`) ships as the `monarch-protocore` extension.
 - **Maintenance mode** — the temporary state the ISO boots into, waiting to receive a

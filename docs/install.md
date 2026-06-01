@@ -75,6 +75,19 @@ hcloud-upload-image upload --image-path monarch-os-talos-v1.13.0-amd64.raw.xz \
 ```
 Then create servers from the resulting snapshot/image. (Manual equivalent: boot a server into **rescue**, `wget … | xz -d | dd of=/dev/sda`, power off, take a snapshot.)
 
+Before attaching the node to production peers, apply the release-derived Hetzner
+firewall in dry-run mode, review the generated rules, then set
+`HCLOUD_FIREWALL_APPLY=true`:
+
+```bash
+make hcloud-firewall-policy \
+  NETWORK_POLICY_METADATA=./monarch-os-talos-v1.13.0-amd64.release.json \
+  TALOS_ALLOWED_CIDRS=10.10.0.0/16 \
+  RPC_ALLOWED_CIDRS=10.20.0.0/16 \
+  P2P_ALLOWED_CIDRS=0.0.0.0/0,::/0 \
+  HCLOUD_FIREWALL_RULES_OUTPUT=./monarch-hcloud-firewall-rules.json
+```
+
 ### DigitalOcean
 DO accepts compressed raw images directly. Images → **Custom Images** → upload by URL (paste the release `.raw.xz` URL), or:
 ```bash
@@ -131,6 +144,14 @@ Check that `genesisHash` and `chainId` match the canonical [`chain-registry/chai
 
 ## 5. Become an operator
 
-Running a synced node is step one. To **register as an operator** (BLS proof-of-possession + self-bond) and participate in a cluster, use **Monarch desktop** (Operator → register) or the `protocore registry register` CLI. Reminder on trust posture (§0): for **mainnet signing** you want a **bare-metal TPM-2.0** box; cloud/vTPM is fine for the testnet release candidate.
+Running a synced node is step one. Operator-signing enrollment is still a preview
+path: validate an enrollment manifest, stage the required file references under
+`/var/lib/protocore`, and let the extension fail closed if release digest, TPM,
+or key-share evidence is missing. Reminder on trust posture (§0): for **mainnet
+signing** you want a **bare-metal TPM-2.0** box; cloud/vTPM is fine for the
+testnet release candidate.
 
-Operator enrollment / cluster-onboarding runbooks are published at [docs.monolythium.com](https://docs.monolythium.com).
+See [`operator-runbooks.md`](./operator-runbooks.md) for the current preview
+enrollment and cluster-onboarding workflow. Production operator docs will be
+published at [docs.monolythium.com](https://docs.monolythium.com) after the
+final on-chain enrollment, rotation, and recovery flows are wired.
