@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -187,6 +188,57 @@ static int mkdir_p(const char *path) {
         return -1;
     }
 
+    return 0;
+}
+
+/* Provision the keystore passphrase used to seal the transport ML-KEM key
+ * (and, for operator nodes, the BLS seed) at rest on public-profile chains
+ * (AUD-0029). If the file already exists it is reused unchanged across
+ * restarts (the transport identity must stay stable). Otherwise a per-node
+ * 256-bit random passphrase is generated, hex-encoded, and written 0600 —
+ * no default secret is ever shipped in the image. */
+static int ensure_keystore_passphrase(const char *path) {
+    if (access(path, F_OK) == 0) {
+        return 0;
+    }
+
+    unsigned char raw[32];
+    FILE *rnd = fopen("/dev/urandom", "rb");
+    if (!rnd) {
+        perror("fopen /dev/urandom");
+        return -1;
+    }
+    size_t got = fread(raw, 1, sizeof(raw), rnd);
+    fclose(rnd);
+    if (got != sizeof(raw)) {
+        fprintf(stderr, "short read from /dev/urandom while generating keystore passphrase\n");
+        return -1;
+    }
+
+    static const char hexd[] = "0123456789abcdef";
+    char hex[sizeof(raw) * 2 + 1];
+    for (size_t i = 0; i < sizeof(raw); ++i) {
+        hex[2 * i] = hexd[(raw[i] >> 4) & 0x0f];
+        hex[2 * i + 1] = hexd[raw[i] & 0x0f];
+    }
+    hex[sizeof(raw) * 2] = '\0';
+
+    int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+    if (fd < 0) {
+        perror("open keystore passphrase file");
+        return -1;
+    }
+    size_t to_write = strlen(hex);
+    ssize_t written = write(fd, hex, to_write);
+    if (written < 0 || (size_t)written != to_write) {
+        perror("write keystore passphrase file");
+        close(fd);
+        return -1;
+    }
+    if (close(fd) != 0) {
+        perror("close keystore passphrase file");
+        return -1;
+    }
     return 0;
 }
 
@@ -434,7 +486,7 @@ static void write_peer_list(FILE *out, const char *peers) {
     fputc(']', out);
 }
 
-static int write_first_boot_config(const char *path) {
+static int write_first_boot_config(const char *path, const char *passphrase_file) {
     const char *chain_id = env_or_default("PROTOCORE_CHAIN_ID", "69420");
     const char *p2p_listen = env_or_default("PROTOCORE_P2P_LISTEN", "/ip4/0.0.0.0/tcp/29898");
     const char *p2p_peers = getenv("PROTOCORE_P2P_PEERS");
@@ -489,6 +541,9 @@ static int write_first_boot_config(const char *path) {
     } else {
         fputs("enabled = false\n", out);
     }
+    fputs("\n[keystore]\npassphrase_file = ", out);
+    write_quoted(out, passphrase_file);
+    fputc('\n', out);
     fputs("\n[retention]\narchive = false\nprune_period_blocks = 10000\n", out);
 
     if (fclose(out) != 0) {
@@ -529,6 +584,32 @@ int main(void) {
         return 1;
     }
 
+    /* Resolve + provision the keystore passphrase. Operators mount their own
+     * secret via PROTOCORE_KEYSTORE_PASSPHRASE_FILE (a file path; the inline
+     * PROTOCORE_KEYSTORE_PASSPHRASE env stays rejected by
+     * reject_inline_secret_envs). With no operator file, a per-node passphrase
+     * is auto-generated under <home>/keystore and persisted on the STATE
+     * partition so a default full-node image boots with no secret material. */
+    char passphrase_path[640];
+    const char *pp_file_env = getenv("PROTOCORE_KEYSTORE_PASSPHRASE_FILE");
+    if (pp_file_env && pp_file_env[0]) {
+        if (require_readable_file(pp_file_env, "PROTOCORE_KEYSTORE_PASSPHRASE_FILE") != 0) {
+            return 1;
+        }
+        snprintf(passphrase_path, sizeof(passphrase_path), "%s", pp_file_env);
+    } else {
+        char keystore_dir[640];
+        snprintf(keystore_dir, sizeof(keystore_dir), "%s/keystore", home);
+        if (mkdir_p(keystore_dir) != 0) {
+            perror("mkdir_p keystore");
+            return 1;
+        }
+        snprintf(passphrase_path, sizeof(passphrase_path), "%s/keystore/passphrase", home);
+        if (ensure_keystore_passphrase(passphrase_path) != 0) {
+            return 1;
+        }
+    }
+
     int first_boot = access(config_path, F_OK) != 0;
     if (first_boot) {
         char *init_argv[] = {
@@ -546,7 +627,7 @@ int main(void) {
         if (run_and_wait(init_argv, "protocore init") != 0) {
             return 1;
         }
-        if (write_first_boot_config(config_path) != 0) {
+        if (write_first_boot_config(config_path, passphrase_path) != 0) {
             return 1;
         }
     }
