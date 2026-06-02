@@ -632,9 +632,51 @@ int main(void) {
         }
     }
 
-    if (access(genesis_path, F_OK) != 0 && access(genesis, R_OK) == 0) {
-        if (copy_file(genesis, genesis_path) != 0) {
-            return 1;
+    /* Dynamic genesis resolution from the public chain-registry. The image
+     * bakes WHO to trust (the registry path) not WHAT to run (no genesis hash),
+     * so a re-genesis is picked up automatically on a fresh boot. The fetch is
+     * done IN the binary (in-process TLS) — the hardened rootfs has no HTTP
+     * client. Only on first boot (genesis.toml absent); a running node's
+     * genesis is never re-fetched. */
+    if (access(genesis_path, F_OK) != 0) {
+        const char *registry_network =
+            env_or_default("PROTOCORE_REGISTRY_NETWORK", "testnet-69420");
+        char *resolve_argv[] = {
+            "./protocore",
+            "--home", (char *)home,
+            "--network", (char *)network,
+            "--output", "json",
+            "genesis", "resolve",
+            "--registry-network", (char *)registry_network,
+            "--out", genesis_path,
+            "--write-peers", config_path,
+            NULL,
+        };
+        if (run_and_wait(resolve_argv, "protocore genesis resolve") != 0) {
+            /* Resolve failed (registry unreachable / hash mismatch / timeout).
+             * Fall back to the BAKED genesis LOUDLY — it may be STALE relative
+             * to the live chain. PROTOCORE_GENESIS_FALLBACK=fail refuses the
+             * fallback (mainnet fail-closed posture). */
+            const char *fallback =
+                env_or_default("PROTOCORE_GENESIS_FALLBACK", "baked");
+            if (strcmp(fallback, "fail") == 0) {
+                fprintf(stderr,
+                        "FATAL: dynamic genesis resolve failed and "
+                        "PROTOCORE_GENESIS_FALLBACK=fail; refusing to boot.\n");
+                return 1;
+            }
+            fprintf(stderr,
+                    "WARNING: dynamic genesis resolve failed; falling back to "
+                    "the BAKED genesis (may be STALE). Set "
+                    "PROTOCORE_GENESIS_FALLBACK=fail to refuse.\n");
+            if (access(genesis, R_OK) != 0) {
+                fprintf(stderr, "FATAL: no baked genesis fallback at %s\n",
+                        genesis);
+                return 1;
+            }
+            if (copy_file(genesis, genesis_path) != 0) {
+                return 1;
+            }
         }
     }
 
