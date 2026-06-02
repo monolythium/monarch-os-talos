@@ -12,6 +12,7 @@ PROTOCORE_CARGO_FEATURES="${PROTOCORE_CARGO_FEATURES:-mdbx,indexer-postgres}"
 CHAIN_PROFILE="${CHAIN_PROFILE:-testnet}"
 CHAIN_ID="${CHAIN_ID:-69420}"
 GENESIS_TOML="${GENESIS_TOML:-"$ROOT_DIR/defaults/$CHAIN_PROFILE/genesis.toml"}"
+NAME_REGISTRY_RESERVE_TOML="${NAME_REGISTRY_RESERVE_TOML:-"$ROOT_DIR/defaults/$CHAIN_PROFILE/name-registry-reserve-$CHAIN_PROFILE.toml"}"
 PROTOCORE_P2P_LISTEN="${PROTOCORE_P2P_LISTEN:-/ip4/0.0.0.0/tcp/29898}"
 PROTOCORE_RPC_LISTEN="${PROTOCORE_RPC_LISTEN:-0.0.0.0:8545}"
 PROTOCORE_DISCOVERY="${PROTOCORE_DISCOVERY:-hybrid}"
@@ -30,6 +31,9 @@ PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-}"
 [[ "$PROTOCORE_BINARY" = /* ]] || PROTOCORE_BINARY="$ROOT_DIR/$PROTOCORE_BINARY"
 if [[ -n "$GENESIS_TOML" && "$GENESIS_TOML" != /* ]]; then
   GENESIS_TOML="$ROOT_DIR/$GENESIS_TOML"
+fi
+if [[ -n "$NAME_REGISTRY_RESERVE_TOML" && "$NAME_REGISTRY_RESERVE_TOML" != /* ]]; then
+  NAME_REGISTRY_RESERVE_TOML="$ROOT_DIR/$NAME_REGISTRY_RESERVE_TOML"
 fi
 
 mkdir -p "$OUT_DIR" "$BUILD_DIR"
@@ -79,6 +83,20 @@ if [[ -n "$GENESIS_TOML" && -f "$GENESIS_TOML" ]]; then
   cp "$GENESIS_TOML" "$SERVICE_ROOT/defaults/$CHAIN_PROFILE/genesis.toml"
 fi
 
+# Bake the name-registry reserve manifest. On a public-profile chain the node
+# refuses to boot (RuntimeError::Boot) unless
+# <home>/<network>/name-registry-reserve-<network>.toml exists, so the manifest
+# must travel with the image exactly like the baked genesis. The entrypoint
+# seeds it into the per-network state subdir on first boot.
+RESERVE_BASENAME="name-registry-reserve-$CHAIN_PROFILE.toml"
+if [[ -n "$NAME_REGISTRY_RESERVE_TOML" && -f "$NAME_REGISTRY_RESERVE_TOML" ]]; then
+  mkdir -p "$SERVICE_ROOT/defaults/$CHAIN_PROFILE"
+  cp "$NAME_REGISTRY_RESERVE_TOML" "$SERVICE_ROOT/defaults/$CHAIN_PROFILE/$RESERVE_BASENAME"
+else
+  echo "name-registry reserve manifest not found at $NAME_REGISTRY_RESERVE_TOML; public-profile nodes will refuse to boot without it" >&2
+  exit 1
+fi
+
 while read -r lib; do
   [[ -z "$lib" ]] && continue
   target="$SERVICE_ROOT$lib"
@@ -119,6 +137,7 @@ $(if [[ -n "$PROTOCORE_DKG_TRANSCRIPT_FILE" ]]; then printf '    - PROTOCORE_DKG
     - PROTOCORE_OUTPUT=json
     - PROTOCORE_YES=true
     - PROTOCORE_GENESIS_TOML=./defaults/$CHAIN_PROFILE/genesis.toml
+    - PROTOCORE_NAME_REGISTRY_RESERVE_TOML=./defaults/$CHAIN_PROFILE/$RESERVE_BASENAME
   mounts:
     - source: /var/lib/protocore
       destination: /var/lib/protocore

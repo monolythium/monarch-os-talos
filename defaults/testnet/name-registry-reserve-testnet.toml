@@ -1,0 +1,37 @@
+# Testnet name registry reserve manifest — testnet only.
+#
+# This file is REPLACED at mainnet activation by Nayiem with the full
+# trademark + ecosystem reserve list. Do not extend on testnet without
+# coordination — every entry burns a permanent name.
+#
+# Owner: foundation 3-of-5 multi-sig at monom16ets48dm0guclykv2hf2z7utnrarlhyw9az7nn
+# (20-byte payload 0xd6570a9dbb7a398f92cc55d2a17b8b98fa3fdc8e)
+# (see crates/core/runtime/src/config.rs::TESTNET_FOUNDATION_MULTISIG).
+
+[[reserve]]
+name = "monolythium"
+category = "human"  # canonical brand at the top level
+
+[[reserve]]
+name = "monolabs"
+category = "human"
+
+[[reserve]]
+name = "monoplay"
+category = "human"
+
+[[reserve]]
+name = "monocard"
+category = "human"
+
+[[reserve]]
+name = "monovpn"
+category = "human"
+
+[[reserve]]
+name = "mono"
+category = "human"
+
+[[reserve]]
+name = "lyth"
+category = "human"

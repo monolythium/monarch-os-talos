@@ -566,6 +566,8 @@ int main(void) {
     const char *home = env_or_default("PROTOCORE_HOME", "/var/lib/protocore");
     const char *network = env_or_default("PROTOCORE_NETWORK", "testnet");
     const char *genesis = env_or_default("PROTOCORE_GENESIS_TOML", "./defaults/testnet/genesis.toml");
+    const char *reserve = env_or_default("PROTOCORE_NAME_REGISTRY_RESERVE_TOML",
+                                         "./defaults/testnet/name-registry-reserve-testnet.toml");
     char config_path[640];
     char genesis_path[640];
 
@@ -677,6 +679,37 @@ int main(void) {
             if (copy_file(genesis, genesis_path) != 0) {
                 return 1;
             }
+        }
+    }
+
+    /* Seed the name-registry reserve manifest on first boot. On a
+     * public-profile chain (testnet 69420 / a future blessed mainnet id) the
+     * node refuses to boot (RuntimeError::Boot) unless
+     * <home>/<network>/name-registry-reserve-<network>.toml exists — there is
+     * no implicit default for the trademark reserve. The image bakes the
+     * manifest under ./defaults/<network>/; copy it into the per-network state
+     * subdir the runtime loader reads (mirrors testnet_bringup's placement
+     * under <home>/<network>/). Only if absent — a running node's reserve is
+     * never overwritten. */
+    char reserve_dir[640];
+    char reserve_path[768];
+    snprintf(reserve_dir, sizeof(reserve_dir), "%s/%s", home, network);
+    snprintf(reserve_path, sizeof(reserve_path),
+             "%s/name-registry-reserve-%s.toml", reserve_dir, network);
+    if (access(reserve_path, F_OK) != 0) {
+        if (access(reserve, R_OK) != 0) {
+            fprintf(stderr,
+                    "FATAL: no baked name-registry reserve manifest at %s; "
+                    "public-profile nodes refuse to boot without it\n",
+                    reserve);
+            return 1;
+        }
+        if (mkdir_p(reserve_dir) != 0) {
+            perror("mkdir_p reserve dir");
+            return 1;
+        }
+        if (copy_file(reserve, reserve_path) != 0) {
+            return 1;
         }
     }
 
