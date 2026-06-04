@@ -19,6 +19,8 @@ environment:
   # - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
   # Optional first-boot generation path. The operator index is 1-based and
   # must match the cluster seal-recipient slot for the configured epoch.
+  # Generation writes the public roster key to:
+  # /var/lib/protocore/operator/threshold/lythiumseal-operator-key.ek
   # - PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY=true
   # - PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX=1
   # - PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH=0

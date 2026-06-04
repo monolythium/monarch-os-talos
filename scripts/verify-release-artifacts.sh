@@ -487,9 +487,10 @@ check_provisioning_policy() {
   tpm_event_log_path="$(jq -r '.provisioning_policy.tpm_binding.event_log_file_path // ""' "$metadata_path")"
   tpm_sealed_env="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_env // ""' "$metadata_path")"
   tpm_sealed_path="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_path // ""' "$metadata_path")"
-  local lythiumseal_env lythiumseal_path lythiumseal_generate lythiumseal_index lythiumseal_epoch
+  local lythiumseal_env lythiumseal_path lythiumseal_ek_path lythiumseal_generate lythiumseal_index lythiumseal_epoch
   lythiumseal_env="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_env // ""' "$metadata_path")"
   lythiumseal_path="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_path // ""' "$metadata_path")"
+  lythiumseal_ek_path="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_encapsulation_key_file_path // ""' "$metadata_path")"
   lythiumseal_generate="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.generate_value // ""' "$metadata_path")"
   lythiumseal_index="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.operator_index // ""' "$metadata_path")"
   lythiumseal_epoch="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.epoch // ""' "$metadata_path")"
@@ -621,6 +622,8 @@ check_provisioning_policy() {
   fi
   [[ "$lythiumseal_env" == "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" ]] \
     || fail "provisioning policy LythiumSeal operator key env mismatch: $lythiumseal_env"
+  [[ "$lythiumseal_ek_path" == "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.ek" ]] \
+    || fail "provisioning policy LythiumSeal operator EK path mismatch: $lythiumseal_ek_path"
   if [[ "$tpm_required" == "true" ]]; then
     [[ "$lythiumseal_path" == "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc" ]] \
       || fail "provisioning policy LythiumSeal operator key path mismatch: $lythiumseal_path"

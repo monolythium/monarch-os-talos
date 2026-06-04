@@ -155,7 +155,9 @@ metadata:
 `PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX` is 1-based and must match the
 cluster seal-recipient slot. The generated key is sealed to the canonical
 `PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE` path and the emitted public
-encapsulation key must be captured into the cluster/genesis roster material.
+encapsulation key is also written to
+`/var/lib/protocore/operator/threshold/lythiumseal-operator-key.ek`; that public
+sidecar must be captured into the cluster/genesis roster material.
 
 The QEMU release smoke path exercises the same file contract. When
 `PROTOCORE_REQUIRE_ENROLLMENT=true`, `make smoke-qemu-config` writes a

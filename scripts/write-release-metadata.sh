@@ -363,6 +363,7 @@ jq -s \
         dkg_transcript_file_path: $protocore_dkg_transcript_file,
         lythiumseal_operator_key_file_env: "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
         lythiumseal_operator_key_file_path: $protocore_lythiumseal_operator_key_file,
+        lythiumseal_operator_encapsulation_key_file_path: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.ek",
         lythiumseal_operator_key_generation: {
           generate_env: "PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY",
           generate_value: $protocore_generate_lythiumseal_operator_key,
