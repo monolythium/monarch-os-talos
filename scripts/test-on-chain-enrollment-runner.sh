@@ -94,12 +94,13 @@ jq -S -n \
       }
     },
     secret_files: {
-      operator_identity_key: "/var/lib/protocore/secrets/operator-identity.key",
-      bls_share: "/var/lib/protocore/secrets/bls-share",
-      cluster_key_share: "/var/lib/protocore/secrets/cluster-key-share",
-      dkg_transcript: "/var/lib/protocore/secrets/dkg-transcript.json",
+      operator_consensus_key: "/var/lib/protocore/secrets/operator-consensus.key",
+      key_transcript: "/var/lib/protocore/secrets/key-transcript.json",
       lythiumseal_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
-      tpm_sealed_bls_share: "/var/lib/protocore/secrets/bls-share.sealed"
+      tpm_sealed_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
+      operator_identity_key: "/var/lib/protocore/secrets/operator-consensus.key",
+      dkg_transcript: "/var/lib/protocore/secrets/key-transcript.json",
+      tpm_sealed_bls_share: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
     }
   }' >"$input_manifest"
 

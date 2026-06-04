@@ -48,6 +48,27 @@ validate_file_ref() {
   fi
 }
 
+secret_file_ref() {
+  local key="$1"
+  jq -r --arg key "$key" '.secret_files[$key] // ""' "$MANIFEST"
+}
+
+validate_secret_file_ref_any() {
+  local label="$1"
+  shift
+  local key path
+
+  for key in "$@"; do
+    path="$(secret_file_ref "$key")"
+    if [[ -n "$path" ]]; then
+      validate_file_ref "secret_files.$key" "$path"
+      return 0
+    fi
+  done
+
+  fail "secret_files must include $label (${*})"
+}
+
 validate_tx_hash() {
   local label="$1"
   local value="$2"
@@ -305,10 +326,10 @@ if [[ "$role" == "operator-signing" ]]; then
     fail "attestation.tpm.quote_verification is only allowed with hardware-tpm2"
   fi
 
-  for key in operator_identity_key bls_share cluster_key_share dkg_transcript lythiumseal_operator_key tpm_sealed_bls_share; do
-    path="$(jq -r --arg key "$key" '.secret_files[$key] // ""' "$MANIFEST")"
-    validate_file_ref "secret_files.$key" "$path"
-  done
+  validate_secret_file_ref_any "operator consensus key" operator_consensus_key operator_identity_key
+  validate_secret_file_ref_any "key transcript" key_transcript dkg_transcript
+  validate_secret_file_ref_any "LythiumSeal operator key" lythiumseal_operator_key
+  validate_secret_file_ref_any "TPM-sealed operator key" tpm_sealed_operator_key tpm_sealed_bls_share
 
   while IFS= read -r ref; do
     [[ -n "$ref" ]] || continue

@@ -401,11 +401,12 @@ jq -n \
       }
     },
     secret_files: {
-      operator_identity_key: "/var/lib/protocore/secrets/operator-identity.key",
-      bls_share: "/var/lib/protocore/secrets/bls-share",
-      cluster_key_share: "/var/lib/protocore/secrets/cluster-key-share",
-      dkg_transcript: "/var/lib/protocore/secrets/dkg-transcript-next.json",
+      operator_consensus_key: "/var/lib/protocore/secrets/operator-consensus.key",
+      key_transcript: "/var/lib/protocore/secrets/dkg-transcript-next.json",
       lythiumseal_operator_key: "/var/lib/protocore/secrets/share-2.sealed",
+      tpm_sealed_operator_key: "/var/lib/protocore/secrets/share-2.sealed",
+      operator_identity_key: "/var/lib/protocore/secrets/operator-consensus.key",
+      dkg_transcript: "/var/lib/protocore/secrets/dkg-transcript-next.json",
       tpm_sealed_bls_share: "/var/lib/protocore/secrets/share-2.sealed"
     }
   }' >"$valid_enrollment"

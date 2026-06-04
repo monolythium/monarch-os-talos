@@ -20,7 +20,7 @@ make validate-enrollment-manifest \
   REQUIRE_RELEASE_DIGEST=true
 ```
 
-Validate the referenced TPM/DKG evidence files from an offline bundle:
+Validate the referenced TPM/key evidence files from an offline bundle:
 
 ```bash
 make validate-tpm-attestation-evidence \
@@ -42,23 +42,24 @@ Operator-signing manifests must include:
 - `release.expected_digest`
 - `attestation.tpm`, including TPM mode, PCR bank, PCR values for PCRs
   `0`, `2`, `4`, and `7`, quote/event-log file paths, quote/event-log
-  SHA-256 hashes, a quote nonce, and the PCR policy digest used to seal key
-  shares
+  SHA-256 hashes, a quote nonce, and the PCR policy digest used to seal the
+  operator key
 - `attestation.tpm.sealed_key_policy`, including `lythiumseal_operator_key`
   in `key_share_refs`, the PCR policy digest, the key transcript hash, and
   the staged LythiumSeal operator-key hash
 - `attestation.tpm.quote_verification` for hardware TPM nodes, including the
   `tpm2_checkquote` tool binding, AK public key file, quote-signature file,
   PCR digest file, and SHA-256 hashes for those verifier inputs
-- `secret_files.operator_identity_key`, `secret_files.bls_share`,
-  `secret_files.cluster_key_share`, `secret_files.dkg_transcript`,
-  `secret_files.lythiumseal_operator_key`, and the compatibility alias
-  `secret_files.tpm_sealed_bls_share`, all as file paths under
-  `/var/lib/protocore`
+- `secret_files.operator_consensus_key`, `secret_files.key_transcript`,
+  `secret_files.lythiumseal_operator_key`, and
+  `secret_files.tpm_sealed_operator_key`, all as file paths under
+  `/var/lib/protocore`. Legacy aliases `operator_identity_key`,
+  `dkg_transcript`, and `tpm_sealed_bls_share` are still accepted when they
+  point to the same files.
 
-The manifest must not carry inline mnemonics, private keys, passphrases, BLS
-shares, or cluster key shares. Those values must be delivered as files under the
-node data partition and referenced by path. Mainnet operator-signing manifests
+The manifest must not carry inline mnemonics, private keys, passphrases, or key
+material. Those values must be delivered as files under the node data partition
+and referenced by path. Mainnet operator-signing manifests
 must use `attestation.tpm.mode = "hardware-tpm2"`; `vtpm-testnet` is only for
 testnet/cloud rehearsal. Mainnet operator-signing manifests must also include
 `on_chain_registration` with the registry contract address, operator address,
@@ -133,14 +134,18 @@ operator-signing nodes:
 - PROTOCORE_REQUIRE_TPM_BINDING=true
 - PROTOCORE_TPM_QUOTE_FILE=/var/lib/protocore/attestation/quote.bin
 - PROTOCORE_TPM_EVENT_LOG_FILE=/var/lib/protocore/attestation/eventlog.bin
+- PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
 - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
-- PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/dkg-transcript.json
+- PROTOCORE_KEY_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
+- PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
 - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
 ```
 
 When enabled, startup requires enrollment, release digest evidence, TPM quote
 evidence, a staged LythiumSeal operator key, and a key transcript. Final key
-rotation and recovery ceremonies are still tracked in the readiness docs.
+rotation and recovery ceremonies are still tracked in the readiness docs. The
+`PROTOCORE_TPM_SEALED_BLS_SHARE_FILE` and `PROTOCORE_DKG_TRANSCRIPT_FILE` envs
+remain compatibility aliases for existing tooling.
 
 For images that should mint the LythiumSeal operator key on first boot instead
 of staging it in the enrollment bundle, provide the non-secret seal-seat

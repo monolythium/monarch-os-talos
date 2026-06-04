@@ -392,13 +392,26 @@
             }
           },
           "secret_files": {
-            "required": [
-              "operator_identity_key",
-              "bls_share",
-              "cluster_key_share",
-              "dkg_transcript",
-              "lythiumseal_operator_key",
-              "tpm_sealed_bls_share"
+            "allOf": [
+              {
+                "anyOf": [
+                  { "required": ["operator_consensus_key"] },
+                  { "required": ["operator_identity_key"] }
+                ]
+              },
+              {
+                "anyOf": [
+                  { "required": ["key_transcript"] },
+                  { "required": ["dkg_transcript"] }
+                ]
+              },
+              { "required": ["lythiumseal_operator_key"] },
+              {
+                "anyOf": [
+                  { "required": ["tpm_sealed_operator_key"] },
+                  { "required": ["tpm_sealed_bls_share"] }
+                ]
+              }
             ]
           }
         }

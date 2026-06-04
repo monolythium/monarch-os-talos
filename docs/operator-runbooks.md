@@ -172,11 +172,12 @@ DAG round, quorum hash, calldata hash, and canonical attestation payload hash.
 The default strict runner also requires hardware TPM and local TPM evidence.
 
 For operator nodes, the manifest must describe a 10-member cluster with
-a 7-of-10 signing threshold, an active or standby operator index, a DKG epoch,
-TPM PCR quote references, quote/event-log hashes, PCR policy hash, and file
-references under `/var/lib/protocore` for operator identity, cluster
-key share, DKG transcript, and TPM-sealed share. Hardware TPM manifests must
-also include `tpm2_checkquote` verifier inputs. Mainnet operator-signing
+a 7-of-10 signing threshold, an active or standby operator index, a key
+transcript epoch, TPM PCR quote references, quote/event-log hashes, PCR policy
+hash, and file references under `/var/lib/protocore` for the operator consensus
+key, key transcript, LythiumSeal operator key, and TPM-sealed operator key.
+Hardware TPM manifests must also include `tpm2_checkquote` verifier inputs.
+Mainnet operator-signing
 manifests must use hardware TPM 2.0, not the testnet vTPM mode, and must include
 `on_chain_registration` binding the registry contract, operator, cluster,
 enrollment transaction, attestation transaction, DAG round, quorum certificate
@@ -194,27 +195,32 @@ The service config should pin these startup gates:
 
 Use `PROTOCORE_NODE_MODE=full` only for a non-signing RPC/indexer node. The default operator mode creates and seals the node's ML-DSA operator consensus identity on first boot.
 
-For signing nodes with TPM-bound key shares, enable:
+For signing nodes with TPM-bound operator keys, enable:
 
 ```yaml
 - PROTOCORE_REQUIRE_TPM_BINDING=true
 - PROTOCORE_TPM_QUOTE_FILE=/var/lib/protocore/attestation/quote.bin
 - PROTOCORE_TPM_EVENT_LOG_FILE=/var/lib/protocore/attestation/eventlog.bin
-- PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/secrets/bls-share.sealed
-- PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/dkg-transcript.json
+- PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
+- PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
+- PROTOCORE_KEY_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
+- PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
+- PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
 ```
 
 Startup is expected to fail closed when the manifest, digest, TPM evidence, or
-secret file references are missing.
+secret file references are missing. `PROTOCORE_TPM_SEALED_BLS_SHARE_FILE` and
+`PROTOCORE_DKG_TRANSCRIPT_FILE` remain compatibility aliases for older release
+tooling.
 
 Release QEMU smoke rehearses this gate with synthetic testnet-only material:
 `make smoke-qemu-config` stages an operator-signing enrollment manifest, digest
-file, vTPM quote/event-log, TPM-sealed share file, and DKG transcript into
-the generated Talos machine config. The release verifier requires
+file, vTPM quote/event-log, TPM-sealed LythiumSeal operator key, and key
+transcript into the generated Talos machine config. The release verifier requires
 `REQUIRE_ENROLLMENT_RUNTIME_PROOF=true` and
 `REQUIRE_TPM_BINDING_RUNTIME_PROOF=true` for testnet promotion, so the same
-smoke run must prove enrollment and TPM/DKG file evidence before the Protocore
-RPC probe is accepted.
+smoke run must prove enrollment and TPM/key-transcript file evidence before the
+Protocore RPC probe is accepted.
 
 ## 3. Connect Monarch Desktop
 

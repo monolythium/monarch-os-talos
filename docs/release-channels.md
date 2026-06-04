@@ -10,7 +10,7 @@ signatures, and channel compatibility must satisfy the policy.
 | Channel | Current stage | Promotion status |
 | --- | --- | --- |
 | `dev` | Development | Enabled for signed or unsigned development artifacts, but still requires channel metadata, substrate proof, network policy, provisioning policy, clean sources, and concrete `protocore` provenance. |
-| `testnet` | Operator preview | Enabled. Requires signed complete artifact set, configured QEMU smoke with machine-config apply, real `talosctl ext-protocore` service evidence, Protocore RPC evidence, enrollment runtime proof, TPM/DKG/key-share fixture proof, Desktop GUI/Tauri e2e evidence with two-party chat and sender membership proof, runtime substrate proof from `talosctl read`, kernel/rootfs baseline match, no SSH listener on TCP port 22, channel metadata, substrate proof, network policy, provisioning policy, audit-trail policy, clean sources, concrete `protocore` provenance, raw image, extension tarball, SBOMs, cosign signature verification, GitHub SLSA attestation verification, exported offline attestation bundles, and a signed/attested deterministic extension rebuild witness. The release workflow now extracts dm-verity root hashes from smoke evidence and pins them in metadata when the booted artifact exposes active/root-hash evidence; testnet still does not require active dm-verity until that evidence is stable. |
+| `testnet` | Operator preview | Enabled. Requires signed complete artifact set, configured QEMU smoke with machine-config apply, real `talosctl ext-protocore` service evidence, Protocore RPC evidence, enrollment runtime proof, TPM/key-transcript/LythiumSeal operator-key fixture proof, Desktop GUI/Tauri e2e evidence with two-party chat and sender membership proof, runtime substrate proof from `talosctl read`, kernel/rootfs baseline match, no SSH listener on TCP port 22, channel metadata, substrate proof, network policy, provisioning policy, audit-trail policy, clean sources, concrete `protocore` provenance, raw image, extension tarball, SBOMs, cosign signature verification, GitHub SLSA attestation verification, exported offline attestation bundles, and a signed/attested deterministic extension rebuild witness. The release workflow now extracts dm-verity root hashes from smoke evidence and pins them in metadata when the booted artifact exposes active/root-hash evidence; testnet still does not require active dm-verity until that evidence is stable. |
 | `mainnet` | Blocked | Disabled until mainnet genesis/operator roster, enrollment/key-share lifecycle, configured QEMU e2e, Desktop e2e, signed/attested full-release rebuild witness, metadata-pinned active dm-verity rootfs/root-hash attestation, and final operator incident runbooks are published. Mainnet policy sets `REQUIRE_RELEASE_REBUILD_WITNESS=true`, `RUN_REBUILD=true`, `REQUIRE_REBUILD_ALL=true`, and `REQUIRE_DM_VERITY_ACTIVE=true` before it can be enabled, so extracted smoke root hashes must be present in release metadata and match runtime proof. |
 
 ## Promotion Check
@@ -35,9 +35,9 @@ identity, Protocore RPC state, release digest, operation receipt, and two-party
 cluster-member chat back to this OS metadata digest. For testnet, the artifact verifier also requires
 `smoke-qemu` enrollment proof that the booted node saw an operator-signing
 manifest, release digest file, 7-of-10 cluster shape, TPM quote/event-log,
-TPM-sealed BLS share, and DKG transcript through Talos API, with file hashes
-bound back to the enrollment manifest before accepting the same run's Protocore
-RPC evidence. Hardware TPM enrollment bundles must also pass the local
+TPM-sealed LythiumSeal operator key, and key transcript through Talos API, with
+file hashes bound back to the enrollment manifest before accepting the same
+run's Protocore RPC evidence. Hardware TPM enrollment bundles must also pass the local
 `tpm2_checkquote` attestation verifier before production use. The provenance verifier also requires
 `monarch-protocore-<arch>.rebuild-witness.json`, verifies its signature and
 attestation, and downloads GitHub attestation bundles plus `trusted_root.jsonl`

@@ -227,7 +227,7 @@ jq -n \
       role: "operator-signing",
       chain_profile: "testnet",
       chain_id: "69420",
-      node_id: "validator-test-operator-0"
+      node_id: "operator-test-operator-0"
     },
     operator: {
       address: "0x1111111111111111111111111111111111111111",
@@ -270,12 +270,13 @@ jq -n \
       }
     },
     secret_files: {
-      operator_identity_key: "/var/lib/protocore/secrets/operator-identity.key",
-      bls_share: "/var/lib/protocore/secrets/bls-share",
-      cluster_key_share: "/var/lib/protocore/secrets/cluster-key-share",
-      dkg_transcript: "/var/lib/protocore/secrets/dkg-transcript.json",
+      operator_consensus_key: "/var/lib/protocore/secrets/operator-consensus.key",
+      key_transcript: "/var/lib/protocore/secrets/key-transcript.json",
       lythiumseal_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
-      tpm_sealed_bls_share: "/var/lib/protocore/secrets/bls-share.sealed"
+      tpm_sealed_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
+      operator_identity_key: "/var/lib/protocore/secrets/operator-consensus.key",
+      dkg_transcript: "/var/lib/protocore/secrets/key-transcript.json",
+      tpm_sealed_bls_share: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
     }
   }' >"$valid_enrollment"
 
@@ -300,20 +301,20 @@ mkdir -p \
   "$evidence_root/var/lib/protocore/operator/threshold"
 printf 'quote-evidence\n' >"$evidence_root/var/lib/protocore/attestation/quote.bin"
 printf 'event-log-evidence\n' >"$evidence_root/var/lib/protocore/attestation/eventlog.bin"
-printf 'dkg-transcript-evidence\n' >"$evidence_root/var/lib/protocore/secrets/dkg-transcript.json"
+printf 'key-transcript-evidence\n' >"$evidence_root/var/lib/protocore/secrets/key-transcript.json"
 printf 'lythiumseal-operator-key-evidence\n' >"$evidence_root/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
 quote_actual="$(sha256sum "$evidence_root/var/lib/protocore/attestation/quote.bin" | awk '{print $1}')"
 event_log_actual="$(sha256sum "$evidence_root/var/lib/protocore/attestation/eventlog.bin" | awk '{print $1}')"
-dkg_actual="$(sha256sum "$evidence_root/var/lib/protocore/secrets/dkg-transcript.json" | awk '{print $1}')"
+key_transcript_actual="$(sha256sum "$evidence_root/var/lib/protocore/secrets/key-transcript.json" | awk '{print $1}')"
 sealed_actual="$(sha256sum "$evidence_root/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc" | awk '{print $1}')"
 jq \
   --arg quote_actual "$quote_actual" \
   --arg event_log_actual "$event_log_actual" \
-  --arg dkg_actual "$dkg_actual" \
+  --arg key_transcript_actual "$key_transcript_actual" \
   --arg sealed_actual "$sealed_actual" \
   '.attestation.tpm.quote_sha256 = $quote_actual
    | .attestation.tpm.event_log_sha256 = $event_log_actual
-   | .attestation.tpm.sealed_key_policy.dkg_transcript_sha256 = $dkg_actual
+   | .attestation.tpm.sealed_key_policy.dkg_transcript_sha256 = $key_transcript_actual
    | .attestation.tpm.sealed_key_policy.sealed_share_sha256 = $sealed_actual' \
   "$valid_enrollment" >"$evidence_enrollment"
 

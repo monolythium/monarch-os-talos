@@ -101,11 +101,14 @@ pcr_bank="$(field '.attestation.tpm.pcr_bank')"
 quote_nonce="$(field '.attestation.tpm.quote_nonce')"
 quote_file="$(field '.attestation.tpm.quote_file')"
 event_log_file="$(field '.attestation.tpm.event_log_file')"
+key_transcript_file="$(field '.secret_files.key_transcript')"
 dkg_transcript_file="$(field '.secret_files.dkg_transcript')"
 lythiumseal_operator_key_file="$(field '.secret_files.lythiumseal_operator_key')"
+sealed_operator_key_file="$(field '.secret_files.tpm_sealed_operator_key')"
 sealed_bls_share_file="$(field '.secret_files.tpm_sealed_bls_share')"
 quote_verification_present="$(jq -r '.attestation.tpm | has("quote_verification")' "$MANIFEST")"
-sealed_share_file="${lythiumseal_operator_key_file:-$sealed_bls_share_file}"
+transcript_file="${key_transcript_file:-$dkg_transcript_file}"
+sealed_share_file="${lythiumseal_operator_key_file:-${sealed_operator_key_file:-$sealed_bls_share_file}}"
 
 [[ "$role" == "operator-signing" ]] || fail "TPM attestation evidence is only defined for operator-signing manifests"
 
@@ -117,7 +120,7 @@ items="$tmp_dir/file-hashes.items"
 verify_file_hash "tpm_quote" "$quote_file" "$(field '.attestation.tpm.quote_sha256')" >>"$items"
 verify_file_hash "tpm_event_log" "$event_log_file" "$(field '.attestation.tpm.event_log_sha256')" >>"$items"
 verify_file_hash "lythiumseal_operator_key" "$sealed_share_file" "$(field '.attestation.tpm.sealed_key_policy.sealed_share_sha256')" >>"$items"
-verify_file_hash "dkg_transcript" "$dkg_transcript_file" "$(field '.attestation.tpm.sealed_key_policy.dkg_transcript_sha256')" >>"$items"
+verify_file_hash "key_transcript" "$transcript_file" "$(field '.attestation.tpm.sealed_key_policy.dkg_transcript_sha256')" >>"$items"
 
 checkquote_required=false
 case "$REQUIRE_TPM2_CHECKQUOTE" in

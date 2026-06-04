@@ -175,8 +175,8 @@ check_smoke_qemu() {
       || fail "enrollment runtime proof did not verify TPM mode"
     jq -e '.tpm.pcrs | sort == [0, 2, 4, 7]' "$enrollment_log" >/dev/null \
       || fail "enrollment runtime proof did not verify TPM PCR policy"
-    jq -e '.file_hashes | map(.label) | index("tpm_quote") and index("tpm_event_log") and index("lythiumseal_operator_key") and index("dkg_transcript")' "$enrollment_log" >/dev/null \
-      || fail "enrollment runtime proof lacks TPM/DKG file evidence"
+    jq -e '.file_hashes | map(.label) as $labels | ($labels | index("tpm_quote")) and ($labels | index("tpm_event_log")) and ($labels | index("lythiumseal_operator_key")) and (($labels | index("key_transcript")) or ($labels | index("dkg_transcript")))' "$enrollment_log" >/dev/null \
+      || fail "enrollment runtime proof lacks TPM/key-transcript file evidence"
     jq -e '
       def norm: ascii_downcase | ltrimstr("0x");
       . as $root |
@@ -189,9 +189,9 @@ check_smoke_qemu() {
       and any($root.file_hashes[]; .label == "tpm_quote" and (.sha256 | norm) == ($root.tpm.quote_sha256 | norm))
       and any($root.file_hashes[]; .label == "tpm_event_log" and (.sha256 | norm) == ($root.tpm.event_log_sha256 | norm))
       and any($root.file_hashes[]; .label == "lythiumseal_operator_key" and (.sha256 | norm) == ($root.tpm.sealed_share_sha256 | norm))
-      and any($root.file_hashes[]; .label == "dkg_transcript" and (.sha256 | norm) == ($root.tpm.dkg_transcript_sha256 | norm))
+      and any($root.file_hashes[]; (.label == "key_transcript" or .label == "dkg_transcript") and (.sha256 | norm) == ($root.tpm.dkg_transcript_sha256 | norm))
     ' "$enrollment_log" >/dev/null \
-      || fail "enrollment runtime proof does not bind TPM/DKG file hashes to manifest claims"
+      || fail "enrollment runtime proof does not bind TPM/key-transcript file hashes to manifest claims"
   fi
   if [[ "$REQUIRE_SUBSTRATE_RUNTIME_PROOF" == "true" ]]; then
     [[ "$substrate_proof" == "ok" ]] \
@@ -456,7 +456,7 @@ check_network_policy() {
 }
 
 check_provisioning_policy() {
-  local no_default inline_prohibited enrollment_required enrollment_path enrollment_schema enrollment_schema_path enrollment_validator enrollment_hashes_required enrollment_payload_schema enrollment_payload_canonicalization enrollment_payload_hash enrollment_payload_validator enrollment_on_chain_required enrollment_call_binding_required enrollment_payload_binding_required registration_method registration_signature registration_selector attestation_binding digest_env digest_file_env digest_file_path tpm_required tpm_env tpm_quote_env tpm_quote_path tpm_event_log_env tpm_event_log_path tpm_sealed_env tpm_sealed_path tpm_quote_validator tpm_quote_tool tpm_quote_hardware_required tpm_quote_mainnet_required dkg_env dkg_path lifecycle_schema lifecycle_schema_path lifecycle_validator lifecycle_cluster_size lifecycle_threshold lifecycle_approval_threshold lifecycle_mainnet lifecycle_hardware_tpm lifecycle_tpm_binding lifecycle_payload_schema lifecycle_payload_canonicalization lifecycle_payload_hash lifecycle_payload_validator lifecycle_payload_ceremony_method lifecycle_payload_ceremony_selector lifecycle_payload_attestation_method lifecycle_payload_attestation_selector lifecycle_on_chain
+  local no_default inline_prohibited enrollment_required enrollment_path enrollment_schema enrollment_schema_path enrollment_validator enrollment_hashes_required enrollment_payload_schema enrollment_payload_canonicalization enrollment_payload_hash enrollment_payload_validator enrollment_on_chain_required enrollment_call_binding_required enrollment_payload_binding_required registration_method registration_signature registration_selector attestation_binding digest_env digest_file_env digest_file_path tpm_required tpm_env tpm_quote_env tpm_quote_path tpm_event_log_env tpm_event_log_path tpm_sealed_operator_env tpm_sealed_operator_path tpm_sealed_env tpm_sealed_path tpm_quote_validator tpm_quote_tool tpm_quote_hardware_required tpm_quote_mainnet_required key_transcript_env key_transcript_path dkg_env dkg_path lifecycle_schema lifecycle_schema_path lifecycle_validator lifecycle_cluster_size lifecycle_threshold lifecycle_approval_threshold lifecycle_mainnet lifecycle_hardware_tpm lifecycle_tpm_binding lifecycle_payload_schema lifecycle_payload_canonicalization lifecycle_payload_hash lifecycle_payload_validator lifecycle_payload_ceremony_method lifecycle_payload_ceremony_selector lifecycle_payload_attestation_method lifecycle_payload_attestation_selector lifecycle_on_chain
   no_default="$(jq -r '.provisioning_policy.no_default_secrets // ""' "$metadata_path")"
   inline_prohibited="$(jq -r '.provisioning_policy.inline_secret_env_prohibited // ""' "$metadata_path")"
   enrollment_required="$(jq -r '.provisioning_policy.enrollment.required' "$metadata_path")"
@@ -485,6 +485,8 @@ check_provisioning_policy() {
   tpm_quote_path="$(jq -r '.provisioning_policy.tpm_binding.quote_file_path // ""' "$metadata_path")"
   tpm_event_log_env="$(jq -r '.provisioning_policy.tpm_binding.event_log_file_env // ""' "$metadata_path")"
   tpm_event_log_path="$(jq -r '.provisioning_policy.tpm_binding.event_log_file_path // ""' "$metadata_path")"
+  tpm_sealed_operator_env="$(jq -r '.provisioning_policy.tpm_binding.sealed_operator_key_file_env // ""' "$metadata_path")"
+  tpm_sealed_operator_path="$(jq -r '.provisioning_policy.tpm_binding.sealed_operator_key_file_path // ""' "$metadata_path")"
   tpm_sealed_env="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_env // ""' "$metadata_path")"
   tpm_sealed_path="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_path // ""' "$metadata_path")"
   local lythiumseal_env lythiumseal_path lythiumseal_ek_path lythiumseal_generate lythiumseal_index lythiumseal_epoch
@@ -494,8 +496,18 @@ check_provisioning_policy() {
   lythiumseal_generate="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.generate_value // ""' "$metadata_path")"
   lythiumseal_index="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.operator_index // ""' "$metadata_path")"
   lythiumseal_epoch="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.epoch // ""' "$metadata_path")"
+  key_transcript_env="$(jq -r '.provisioning_policy.tpm_binding.key_transcript_file_env // ""' "$metadata_path")"
+  key_transcript_path="$(jq -r '.provisioning_policy.tpm_binding.key_transcript_file_path // ""' "$metadata_path")"
   dkg_env="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_env // ""' "$metadata_path")"
   dkg_path="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_path // ""' "$metadata_path")"
+  if [[ -z "$tpm_sealed_operator_env" ]]; then
+    tpm_sealed_operator_env="$tpm_sealed_env"
+    tpm_sealed_operator_path="$tpm_sealed_path"
+  fi
+  if [[ -z "$key_transcript_env" ]]; then
+    key_transcript_env="$dkg_env"
+    key_transcript_path="$dkg_path"
+  fi
   tpm_quote_validator="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.validator // ""' "$metadata_path")"
   tpm_quote_tool="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.tool // ""' "$metadata_path")"
   tpm_quote_hardware_required="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.required_for_hardware_tpm // false' "$metadata_path")"
@@ -614,6 +626,12 @@ check_provisioning_policy() {
     [[ "$tpm_event_log_path" == "/var/lib/protocore/attestation/eventlog.bin" ]] \
       || fail "provisioning policy TPM event-log file path mismatch: $tpm_event_log_path"
   fi
+  [[ "$tpm_sealed_operator_env" == "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE" || "$tpm_sealed_operator_env" == "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" ]] \
+    || fail "provisioning policy TPM sealed operator key file env mismatch: $tpm_sealed_operator_env"
+  if [[ "$tpm_required" == "true" ]]; then
+    [[ "$tpm_sealed_operator_path" == "$lythiumseal_path" ]] \
+      || fail "provisioning policy TPM sealed operator key path must match LythiumSeal key path: sealed=$tpm_sealed_operator_path lythiumseal=$lythiumseal_path"
+  fi
   [[ "$tpm_sealed_env" == "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" ]] \
     || fail "provisioning policy TPM sealed BLS share file env mismatch: $tpm_sealed_env"
   if [[ "$tpm_required" == "true" ]]; then
@@ -628,11 +646,17 @@ check_provisioning_policy() {
     [[ "$lythiumseal_path" == "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc" ]] \
       || fail "provisioning policy LythiumSeal operator key path mismatch: $lythiumseal_path"
   fi
+  [[ "$key_transcript_env" == "PROTOCORE_KEY_TRANSCRIPT_FILE" || "$key_transcript_env" == "PROTOCORE_DKG_TRANSCRIPT_FILE" ]] \
+    || fail "provisioning policy key transcript file env mismatch: $key_transcript_env"
+  if [[ "$tpm_required" == "true" ]]; then
+    [[ "$key_transcript_path" == "/var/lib/protocore/secrets/key-transcript.json" || "$key_transcript_path" == "/var/lib/protocore/secrets/dkg-transcript.json" ]] \
+      || fail "provisioning policy key transcript file path mismatch: $key_transcript_path"
+  fi
   [[ "$dkg_env" == "PROTOCORE_DKG_TRANSCRIPT_FILE" ]] \
     || fail "provisioning policy DKG transcript file env mismatch: $dkg_env"
   if [[ "$tpm_required" == "true" ]]; then
-    [[ "$dkg_path" == "/var/lib/protocore/secrets/dkg-transcript.json" ]] \
-      || fail "provisioning policy DKG transcript file path mismatch: $dkg_path"
+    [[ "$dkg_path" == "$key_transcript_path" ]] \
+      || fail "provisioning policy DKG transcript alias must match key transcript path: dkg=$dkg_path key_transcript=$key_transcript_path"
   fi
   [[ "$tpm_quote_validator" == "scripts/validate-tpm-attestation-evidence.sh" ]] \
     || fail "TPM quote verification validator mismatch: $tpm_quote_validator"
@@ -737,8 +761,16 @@ check_provisioning_policy() {
       || fail "protocore service config does not pin TPM quote file: $tpm_quote_path"
     grep -Fx "    - PROTOCORE_TPM_EVENT_LOG_FILE=$tpm_event_log_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin TPM event-log file: $tpm_event_log_path"
+    if [[ "$tpm_sealed_operator_env" == "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE" ]]; then
+      grep -Fx "    - PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=$tpm_sealed_operator_path" <<<"$service_config" >/dev/null \
+        || fail "protocore service config does not pin TPM-sealed operator key file: $tpm_sealed_operator_path"
+    fi
     grep -Fx "    - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=$tpm_sealed_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin TPM-sealed share compatibility alias: $tpm_sealed_path"
+    if [[ "$key_transcript_env" == "PROTOCORE_KEY_TRANSCRIPT_FILE" ]]; then
+      grep -Fx "    - PROTOCORE_KEY_TRANSCRIPT_FILE=$key_transcript_path" <<<"$service_config" >/dev/null \
+        || fail "protocore service config does not pin key transcript file: $key_transcript_path"
+    fi
     grep -Fx "    - PROTOCORE_DKG_TRANSCRIPT_FILE=$dkg_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin DKG transcript file: $dkg_path"
     grep -Fx "    - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=$lythiumseal_path" <<<"$service_config" >/dev/null \

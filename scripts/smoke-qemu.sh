@@ -33,9 +33,11 @@ PROTOCORE_ENROLLMENT_FILE="${PROTOCORE_ENROLLMENT_FILE:-/var/lib/protocore/enrol
 PROTOCORE_EXPECTED_DIGEST_FILE="${PROTOCORE_EXPECTED_DIGEST_FILE:-/var/lib/protocore/enrollment/protocore.sha256}"
 PROTOCORE_TPM_QUOTE_FILE="${PROTOCORE_TPM_QUOTE_FILE:-/var/lib/protocore/attestation/quote.bin}"
 PROTOCORE_TPM_EVENT_LOG_FILE="${PROTOCORE_TPM_EVENT_LOG_FILE:-/var/lib/protocore/attestation/eventlog.bin}"
-PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-/var/lib/protocore/secrets/dkg-transcript.json}"
 PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc}"
-PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE}"
+PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="${PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE:-${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE}}"
+PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE}"
+PROTOCORE_KEY_TRANSCRIPT_FILE="${PROTOCORE_KEY_TRANSCRIPT_FILE:-${PROTOCORE_DKG_TRANSCRIPT_FILE:-/var/lib/protocore/secrets/key-transcript.json}}"
+PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-$PROTOCORE_KEY_TRANSCRIPT_FILE}"
 REQUIRE_SUBSTRATE_RUNTIME_PROOF="${REQUIRE_SUBSTRATE_RUNTIME_PROOF:-false}"
 KEEP_QEMU_ALIVE="${KEEP_QEMU_ALIVE:-false}"
 RELEASE_METADATA_FILE="${RELEASE_METADATA_FILE:-"$OUT_DIR/monarch-os-talos-$TALOS_VERSION-$ARCH.release.json"}"
@@ -515,12 +517,10 @@ prove_enrollment_runtime() {
       and ($m.attestation.tpm.sealed_key_policy.policy_digest | test("^(0x)?[0-9a-fA-F]{64}$"))
       and ($m.attestation.tpm.sealed_key_policy.dkg_transcript_sha256 | test("^(0x)?[0-9a-fA-F]{64}$"))
       and ($m.attestation.tpm.sealed_key_policy.sealed_share_sha256 | test("^(0x)?[0-9a-fA-F]{64}$"))
-      and ($m.secret_files.operator_identity_key | type == "string")
-      and ($m.secret_files.bls_share | type == "string")
-      and ($m.secret_files.cluster_key_share | type == "string")
-      and ($m.secret_files.dkg_transcript | type == "string")
+      and (($m.secret_files.operator_consensus_key // $m.secret_files.operator_identity_key) | type == "string")
+      and (($m.secret_files.key_transcript // $m.secret_files.dkg_transcript) | type == "string")
       and ($m.secret_files.lythiumseal_operator_key | type == "string")
-      and ($m.secret_files.tpm_sealed_bls_share | type == "string")
+      and (($m.secret_files.tpm_sealed_operator_key // $m.secret_files.tpm_sealed_bls_share) | type == "string")
     ' "$ENROLLMENT_MANIFEST_LOG" >/dev/null || {
       enrollment_runtime_proof="failed"
       echo "enrollment manifest does not match required QEMU operator-signing contract" >&2
@@ -586,12 +586,12 @@ prove_enrollment_runtime() {
   remote_file_hash_json expected_digest "$PROTOCORE_EXPECTED_DIGEST_FILE" >>"$ENROLLMENT_FILE_HASHES.items"
 
   if [[ "$REQUIRE_TPM_BINDING_RUNTIME_PROOF" == "true" ]]; then
-    local quote_path event_log_path sealed_path dkg_path quote_hash_json event_log_hash_json sealed_hash_json dkg_hash_json
-    local quote_hash event_log_hash sealed_hash dkg_hash
+    local quote_path event_log_path sealed_path transcript_path quote_hash_json event_log_hash_json sealed_hash_json transcript_hash_json
+    local quote_hash event_log_hash sealed_hash transcript_hash
     quote_path="$(jq -r '.attestation.tpm.quote_file // ""' "$ENROLLMENT_MANIFEST_LOG")"
     event_log_path="$(jq -r '.attestation.tpm.event_log_file // ""' "$ENROLLMENT_MANIFEST_LOG")"
-    sealed_path="$(jq -r '.secret_files.lythiumseal_operator_key // .secret_files.tpm_sealed_bls_share // ""' "$ENROLLMENT_MANIFEST_LOG")"
-    dkg_path="$(jq -r '.secret_files.dkg_transcript // ""' "$ENROLLMENT_MANIFEST_LOG")"
+    sealed_path="$(jq -r '.secret_files.lythiumseal_operator_key // .secret_files.tpm_sealed_operator_key // .secret_files.tpm_sealed_bls_share // ""' "$ENROLLMENT_MANIFEST_LOG")"
+    transcript_path="$(jq -r '.secret_files.key_transcript // .secret_files.dkg_transcript // ""' "$ENROLLMENT_MANIFEST_LOG")"
 
     [[ "$quote_path" == "$PROTOCORE_TPM_QUOTE_FILE" ]] || {
       enrollment_runtime_proof="failed"
@@ -608,29 +608,29 @@ prove_enrollment_runtime() {
       echo "LythiumSeal operator key path mismatch: manifest=$sealed_path env=$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" >&2
       exit 1
     }
-    [[ "$dkg_path" == "$PROTOCORE_DKG_TRANSCRIPT_FILE" ]] || {
+    [[ "$transcript_path" == "$PROTOCORE_KEY_TRANSCRIPT_FILE" ]] || {
       enrollment_runtime_proof="failed"
-      echo "DKG transcript path mismatch: manifest=$dkg_path env=$PROTOCORE_DKG_TRANSCRIPT_FILE" >&2
+      echo "key transcript path mismatch: manifest=$transcript_path env=$PROTOCORE_KEY_TRANSCRIPT_FILE" >&2
       exit 1
     }
 
     quote_hash_json="$(remote_file_hash_json tpm_quote "$quote_path")"
     event_log_hash_json="$(remote_file_hash_json tpm_event_log "$event_log_path")"
     sealed_hash_json="$(remote_file_hash_json lythiumseal_operator_key "$sealed_path")"
-    dkg_hash_json="$(remote_file_hash_json dkg_transcript "$dkg_path")"
+    transcript_hash_json="$(remote_file_hash_json key_transcript "$transcript_path")"
     printf '%s\n' "$quote_hash_json" >>"$ENROLLMENT_FILE_HASHES.items"
     printf '%s\n' "$event_log_hash_json" >>"$ENROLLMENT_FILE_HASHES.items"
     printf '%s\n' "$sealed_hash_json" >>"$ENROLLMENT_FILE_HASHES.items"
-    printf '%s\n' "$dkg_hash_json" >>"$ENROLLMENT_FILE_HASHES.items"
+    printf '%s\n' "$transcript_hash_json" >>"$ENROLLMENT_FILE_HASHES.items"
 
     quote_hash="$(jq -r '.sha256' <<<"$quote_hash_json")"
     event_log_hash="$(jq -r '.sha256' <<<"$event_log_hash_json")"
     sealed_hash="$(jq -r '.sha256' <<<"$sealed_hash_json")"
-    dkg_hash="$(jq -r '.sha256' <<<"$dkg_hash_json")"
+    transcript_hash="$(jq -r '.sha256' <<<"$transcript_hash_json")"
     require_hash_match "TPM quote" "$(jq -r '.attestation.tpm.quote_sha256' "$ENROLLMENT_MANIFEST_LOG")" "$quote_hash"
     require_hash_match "TPM event log" "$(jq -r '.attestation.tpm.event_log_sha256' "$ENROLLMENT_MANIFEST_LOG")" "$event_log_hash"
     require_hash_match "LythiumSeal operator key" "$(jq -r '.attestation.tpm.sealed_key_policy.sealed_share_sha256' "$ENROLLMENT_MANIFEST_LOG")" "$sealed_hash"
-    require_hash_match "DKG transcript" "$(jq -r '.attestation.tpm.sealed_key_policy.dkg_transcript_sha256' "$ENROLLMENT_MANIFEST_LOG")" "$dkg_hash"
+    require_hash_match "key transcript" "$(jq -r '.attestation.tpm.sealed_key_policy.dkg_transcript_sha256' "$ENROLLMENT_MANIFEST_LOG")" "$transcript_hash"
   fi
 
   while IFS=$'\t' read -r key path; do
@@ -681,8 +681,10 @@ prove_enrollment_runtime() {
         quote_file: $manifest[0].attestation.tpm.quote_file,
         event_log_file: $manifest[0].attestation.tpm.event_log_file,
         lythiumseal_operator_key_file: $manifest[0].secret_files.lythiumseal_operator_key,
-        sealed_bls_share_file: $manifest[0].secret_files.tpm_sealed_bls_share,
-        dkg_transcript_file: $manifest[0].secret_files.dkg_transcript
+        sealed_operator_key_file: ($manifest[0].secret_files.tpm_sealed_operator_key // $manifest[0].secret_files.tpm_sealed_bls_share),
+        sealed_bls_share_file: ($manifest[0].secret_files.tpm_sealed_bls_share // null),
+        key_transcript_file: ($manifest[0].secret_files.key_transcript // $manifest[0].secret_files.dkg_transcript),
+        dkg_transcript_file: ($manifest[0].secret_files.dkg_transcript // null)
       },
       file_hashes_log: $file_hashes_log,
       file_hashes: $file_hashes

@@ -488,8 +488,14 @@ if [[ -n "$ENROLLMENT_MANIFEST" ]]; then
   hash32_equals "tpm.sealed_share_policy_hash" "$(jq -r '.attestation.tpm.sealed_key_policy.policy_digest' "$ENROLLMENT_MANIFEST")" "$policy_hash"
   hash32_equals "dkg.transcript_sha256" "$(jq -r '.attestation.tpm.sealed_key_policy.dkg_transcript_sha256' "$ENROLLMENT_MANIFEST")" "$dkg_transcript_sha"
   hash32_equals "sealed_share.sha256" "$(jq -r '.attestation.tpm.sealed_key_policy.sealed_share_sha256' "$ENROLLMENT_MANIFEST")" "$sealed_share_sha"
-  [[ "$dkg_transcript_file" == "$(jq -r '.secret_files.dkg_transcript' "$ENROLLMENT_MANIFEST")" ]] || fail "dkg.transcript_file must match enrollment"
-  [[ "$sealed_share_file" == "$(jq -r '.secret_files.tpm_sealed_bls_share' "$ENROLLMENT_MANIFEST")" ]] || fail "sealed_share.file must match enrollment"
+  enrollment_transcript_file="$(
+    jq -r '.secret_files.key_transcript // .secret_files.dkg_transcript // ""' "$ENROLLMENT_MANIFEST"
+  )"
+  enrollment_sealed_file="$(
+    jq -r '.secret_files.tpm_sealed_operator_key // .secret_files.tpm_sealed_bls_share // ""' "$ENROLLMENT_MANIFEST"
+  )"
+  [[ "$dkg_transcript_file" == "$enrollment_transcript_file" ]] || fail "dkg.transcript_file must match enrollment"
+  [[ "$sealed_share_file" == "$enrollment_sealed_file" ]] || fail "sealed_share.file must match enrollment"
   enrollment_checked=true
 fi
 
