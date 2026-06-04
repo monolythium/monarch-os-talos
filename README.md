@@ -13,7 +13,7 @@ This repository is published primarily for **auditability**. The OS recipe, the 
 - **Signed ISO/raw release automation is live, and preview artifacts are published.** The GitHub Actions workflow downloads a signed `protocore` release asset, builds ISO/raw/extension artifacts with the local Makefile, emits SPDX SBOMs, and signs outputs with cosign keyless. Published `*-preview` releases carry cosign-signed ISOs (see [Trust model + verification](#trust-model--verification)). These previews still bake an **older `protocore` testnet binary and an earlier testnet genesis** — they are for auditability and boot testing, not production operation.
 - **External `make build` needs either a prebuilt `protocore` binary or a sibling core checkout.** The easiest public path is `PROTOCORE_BINARY=/path/to/protocore make build`.
 - **No `monarch-cli` extension is shipped in v1.** The node service is operated through Talos API and Monarch Desktop; any future on-node CLI package must be introduced as a real released extension, not a reserved placeholder.
-- **First-boot operator enrollment, secret injection, firewall enforcement, upgrade/rollback automation, SLSA-level provenance, release-channel promotion, configured QEMU/Desktop e2e, and final Desktop lifecycle hardening are all listed as missing or partial** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md).
+- **First-boot operator enrollment, secret injection, firewall enforcement, upgrade/rollback automation, SLSA-level provenance, release-channel promotion, configured QEMU/Desktop e2e, and final Desktop lifecycle hardening are all listed as missing or partial** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md). The image now creates its own sealed operator consensus identity on first boot; admission and cluster membership are separate chain/desktop flows.
 
 Watch this repo for the first non-preview tag before treating any output as production-grade.
 
@@ -23,7 +23,7 @@ Watch this repo for the first non-preview tag before treating any output as prod
 
 Monarch OS is a custom [Talos Linux](https://www.talos.dev/) distribution for Monolythium operator nodes. Talos is itself an API-driven immutable Linux that has no SSH, no shell, no package manager, and no traditional userspace; Monarch OS extends that base with two purpose-built Talos system extensions:
 
-- **`monarch-protocore`** — packages the `protocore` node binary, supervises it, optionally verifies its on-disk digest before start, stages a Monolythium testnet genesis, and persists node state at `/var/lib/protocore`.
+- **`monarch-protocore`** — packages the `protocore` node binary, supervises it, optionally verifies its on-disk digest before start, creates a sealed per-node operator consensus identity on first boot, stages a Monolythium testnet genesis, and persists node state at `/var/lib/protocore`.
 - **No on-node Monarch CLI** — v1 intentionally keeps operator control in Monarch Desktop and the Talos API.
 
 Operators interact with a running Monarch OS node from a separate workstation through:
@@ -219,12 +219,14 @@ Environment knobs:
 | `DM_VERITY_SUBSTRATE_PROOF` / `DM_VERITY_ROOT_HASH_FORMAT` | `_out/smoke-qemu/substrate-runtime.json` / `lines` | Input proof and output format (`lines`, `csv`, `env`, or `json`) for `make dm-verity-root-hashes`. |
 | `STATE_MIGRATION_REQUIRED` / `STATE_MIGRATION_MODE` | `false` / `none` | State migration policy written into release metadata. Modes are `none`, `backward-compatible`, or `one-way`; non-`none` migrations require a runbook id. |
 | `STATE_MIGRATION_RUNBOOK_ID` / `ROLLBACK_SUPPORTED` | unset / `true` | Required runbook id for staged migrations and whether the target release supports Talos rollback after upgrade. |
+| `PROTOCORE_NODE_MODE` | `operator` | First-boot node mode written to `config.toml`. Use `full` only for a non-signing RPC/indexer node. |
+| `PROTOCORE_NO_OPERATOR` | `false` | Compatibility opt-out. When truthy and `PROTOCORE_NODE_MODE` is unset, first boot uses full-node mode and skips operator consensus key generation. |
 | `PROTOCORE_REQUIRE_ENROLLMENT` | `false` | When `true`, the entrypoint refuses to start unless the enrollment manifest and release digest are present. |
 | `PROTOCORE_ENROLLMENT_FILE` | `/var/lib/protocore/enrollment/enrollment.json` | Enrollment manifest path checked by the entrypoint and release verifier. |
 | `PROTOCORE_EXPECTED_DIGEST_FILE` | unset | Release digest file path for fail-closed enrollment. The release workflow uses `/var/lib/protocore/enrollment/protocore.sha256`. |
-| `PROTOCORE_REQUIRE_TPM_BINDING` | `false` | When `true`, the entrypoint requires TPM quote/event-log evidence, a TPM-sealed BLS share, and a DKG transcript. |
+| `PROTOCORE_REQUIRE_TPM_BINDING` | `false` | When `true`, the entrypoint requires TPM quote/event-log evidence, a TPM-sealed share, and a DKG transcript. |
 | `PROTOCORE_TPM_QUOTE_FILE` / `PROTOCORE_TPM_EVENT_LOG_FILE` | unset | TPM quote and event-log evidence paths. The QEMU smoke config can stage synthetic vTPM testnet fixtures for these paths. |
-| `PROTOCORE_TPM_SEALED_BLS_SHARE_FILE` / `PROTOCORE_DKG_TRANSCRIPT_FILE` | unset | TPM-sealed share and DKG transcript paths required by TPM-bound signing nodes. |
+| `PROTOCORE_TPM_SEALED_BLS_SHARE_FILE` / `PROTOCORE_DKG_TRANSCRIPT_FILE` | unset | Legacy-named TPM-sealed share and DKG transcript paths required by TPM-bound operator nodes. |
 | `LOCAL_EVIDENCE_ROOT` | unset | Local root used by `make validate-tpm-attestation-evidence` to resolve `/var/lib/protocore/...` evidence paths from an offline bundle. |
 | `REQUIRE_TPM2_CHECKQUOTE` | `auto` | `auto` runs `tpm2_checkquote` for `hardware-tpm2` manifests, `true` always requires it, and `false` verifies hashes only. |
 | `REQUIRE_TALOS_API_PROBE` / `REQUIRE_TALOSCTL_PROBE` | `false` | When `true`, `smoke-qemu` must prove Talos API reachability; it uses `talosctl version --insecure` when `talosctl` is installed and falls back to TCP-only evidence otherwise. |
@@ -260,7 +262,7 @@ Environment knobs:
 | `REQUIRE_SMOKE_QEMU_RPC` | `false` | When `true`, `verify-artifacts` requires smoke output proving Protocore RPC answered. |
 | `REQUIRE_SMOKE_QEMU_TALOSCTL` | `false` | When `true`, `verify-artifacts` requires the QEMU smoke result to come from a real `talosctl` API probe, not TCP-only reachability. |
 | `REQUIRE_ENROLLMENT_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` reads the staged enrollment manifest and release digest through Talos API and verifies the operator-signing, 7-of-10, chain, digest, and mainnet on-chain registration call-binding contract. |
-| `REQUIRE_TPM_BINDING_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` also verifies TPM quote/event-log, TPM-sealed BLS share, and DKG transcript file evidence. |
+| `REQUIRE_TPM_BINDING_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` also verifies TPM quote/event-log, TPM-sealed share, and DKG transcript file evidence. |
 | `REQUIRE_SUBSTRATE_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` reads `/proc/config.gz`, `/proc/mounts`, `/proc/cmdline`, `/proc/modules`, and `/proc/filesystems` through Talos API and `verify-artifacts` requires proof that root is read-only, an immutable base filesystem is mounted read-only, required kernel options are enabled, and required attack-surface options are disabled or absent. |
 | `REQUIRE_DM_VERITY_ACTIVE` | `false` | When `true`, `verify-artifacts` requires runtime proof of active dm-verity, root-hash evidence from the booted image, and a runtime hash matching `substrate.dm_verity.expected_root_hashes` in release metadata. Mainnet policy sets this to `true`; current testnet keeps it observable but not required until the Talos artifact exposes a stable root hash. |
 | `KEEP_QEMU_ALIVE` | `false` | When `true`, `smoke-qemu` writes `_out/smoke-qemu/live-env.sh` with Desktop e2e settings, including the expected Protocore digest from release metadata when available, and keeps the QEMU VM running until the smoke process is stopped. |
@@ -451,7 +453,7 @@ cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protoc
 - [`docs/release-channels.md`](./docs/release-channels.md) — dev/testnet/mainnet promotion policy and the local promotion check.
 - [`docs/network-policy.md`](./docs/network-policy.md) — default Talos/Protocore ports, prohibited production surfaces, and release verifier enforcement.
 - [`docs/provenance-and-rebuild.md`](./docs/provenance-and-rebuild.md) — operator-side signature checks, GitHub attestation verification, offline attestation bundles, source lineage checks, and clean rebuild comparison.
-- [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) — how an operator workstation provisions a Monarch OS node over Talos API mTLS + Protocore JSON-RPC; what the OS image does *not* ship (no SSH, no operator keystore passphrases, no default node identity).
+- [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) — how an operator workstation provisions a Monarch OS node over Talos API mTLS + Protocore JSON-RPC; what the OS image does and does not ship: no SSH, no operator keystore passphrases, no shipped key material, and a per-node operator identity generated on first boot.
 - [`docs/upgrade-and-storage.md`](./docs/upgrade-and-storage.md) — how a node installs from the ISO to an internal disk, where blockchain data is stored (`/var/lib/protocore` on the persistent partition), and how upgrades swap the OS image while preserving node state. Buzzwords explained.
 - [`docs/operator-runbooks.md`](./docs/operator-runbooks.md) — preview operator runbooks for verifying artifacts, installing, enrolling, connecting Desktop, operating, upgrading, recovering, rotating, and responding to incidents.
 - [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) — comprehensive gap list. What's missing across release artifacts, provisioning, secret handling, network policy, health model, upgrade/rollback, recovery, desktop client, security posture, test coverage, and operator docs. Followed by a phased build plan.

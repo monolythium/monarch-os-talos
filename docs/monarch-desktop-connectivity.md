@@ -3,7 +3,7 @@
 Monarch OS is a Talos-based node image. It does not expose SSH and it does not run the Monarch Desktop GUI locally. Monarch Desktop runs on the operator workstation and connects to the node over two separate channels:
 
 1. Talos API on TCP `50000`, authenticated with Talos client certificates from `talosconfig`.
-2. Protocore JSON-RPC on TCP `8545`, exposed by the `protocore` extension service after operator secrets are provisioned.
+2. Protocore JSON-RPC on TCP `8545`, exposed by the `protocore` extension service after first-boot provisioning.
 
 ## Trust Model
 
@@ -16,7 +16,8 @@ The OS image intentionally ships without:
 - operator keystore passphrases
 - operator key material
 - default SSH access
-- a default writable node identity
+
+On first boot the entrypoint creates a per-node keystore passphrase under `/var/lib/protocore/keystore/passphrase`, writes `config.toml` with `node.mode = "operator"`, and runs `protocore registry gen-operator-keys` to seal the ML-DSA operator consensus seed at `/var/lib/protocore/operator/consensus.key.enc`. Set `PROTOCORE_NODE_MODE=full` only for non-signing RPC/indexer nodes.
 
 ## Provisioning Flow
 
@@ -43,7 +44,7 @@ The OS image intentionally ships without:
    examples/protocore-extension-service-config.yaml
    ```
 
-   The example uses file paths for enrollment material and release digests. Do not put passphrases, mnemonics, private keys, or key shares directly in `environment:`. The `protocore-entrypoint` rejects known inline secret env vars and placeholder values at start; `make verify-artifacts REQUIRE_PROVISIONING_POLICY=true` checks the shipped service config does the same.
+   The example uses file paths for enrollment material and release digests, and defaults `PROTOCORE_NODE_MODE=operator`. Do not put passphrases, mnemonics, private keys, or key shares directly in `environment:`. The `protocore-entrypoint` rejects known inline secret env vars and placeholder values at start; `make verify-artifacts REQUIRE_PROVISIONING_POLICY=true` checks the shipped service config does the same.
 
    Validate enrollment manifests before copying them to the node:
 
@@ -99,6 +100,7 @@ Implemented in this repository:
 - QEMU smoke path for raw image boot, generated Talos smoke config apply, `ext-protocore` service check, testnet-required Protocore RPC probe, and runtime substrate proof captured through `talosctl read`, including a no-SSH-listener check on TCP port 22
 - `monarch-protocore` Talos system extension
 - `protocore` service entrypoint
+- first-boot operator `config.toml` plus sealed ML-DSA operator consensus identity generation
 - baked testnet genesis staging
 - service gating on `ExtensionServiceConfig`
 - fail-closed runtime checks for placeholder values, inline secret env vars, optional enrollment manifest, and release digest inputs
@@ -110,6 +112,7 @@ Implemented in this repository:
 Still required before a production operator release:
 
 - final key-share rotation, recovery, and audit ceremonies through the enrollment flow
+- cluster admission and seal-roster updates for newly generated operator identities
 - final production Talos certificate issuance automation; rotation manifests and Desktop evidence gates are now checked locally
 - mainnet genesis/operator roster publication before any mainnet channel is enabled
 

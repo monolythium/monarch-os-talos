@@ -18,6 +18,42 @@ static int is_truthy(const char *value) {
                      strcmp(value, "yes") == 0 || strcmp(value, "on") == 0);
 }
 
+static void wipe_bytes(void *ptr, size_t len) {
+    volatile unsigned char *p = (volatile unsigned char *)ptr;
+
+    while (len--) {
+        *p++ = 0;
+    }
+}
+
+static int resolve_operator_mode(void) {
+    const char *node_mode = getenv("PROTOCORE_NODE_MODE");
+    const char *no_operator = getenv("PROTOCORE_NO_OPERATOR");
+    int no_operator_enabled = is_truthy(no_operator);
+
+    if (node_mode && node_mode[0]) {
+        if (strcmp(node_mode, "operator") == 0) {
+            if (no_operator_enabled) {
+                fprintf(stderr,
+                        "PROTOCORE_NODE_MODE=%s conflicts with PROTOCORE_NO_OPERATOR=true\n",
+                        node_mode);
+                return -1;
+            }
+            return 1;
+        }
+        if (strcmp(node_mode, "full") == 0 || strcmp(node_mode, "full-node") == 0 ||
+            strcmp(node_mode, "observer") == 0) {
+            return 0;
+        }
+        fprintf(stderr,
+                "PROTOCORE_NODE_MODE must be one of operator/full, got %s\n",
+                node_mode);
+        return -1;
+    }
+
+    return no_operator_enabled ? 0 : 1;
+}
+
 static int contains_case_insensitive(const char *haystack, const char *needle) {
     size_t needle_len = strlen(needle);
 
@@ -192,7 +228,7 @@ static int mkdir_p(const char *path) {
 }
 
 /* Provision the keystore passphrase used to seal the transport ML-KEM key
- * (and, for operator nodes, the BLS seed) at rest on public-profile chains
+ * and, for operator nodes, the ML-DSA consensus seed at rest on public-profile chains
  * (AUD-0029). If the file already exists it is reused unchanged across
  * restarts (the transport identity must stay stable). Otherwise a per-node
  * 256-bit random passphrase is generated, hex-encoded, and written 0600 —
@@ -318,6 +354,9 @@ static int verify_provisioning_policy(void) {
         "PROTOCORE_EXPECTED_DIGEST",
         "PROTOCORE_EXPECTED_DIGEST_FILE",
         "PROTOCORE_ENROLLMENT_FILE",
+        "PROTOCORE_KEYSTORE_PASSPHRASE_FILE",
+        "PROTOCORE_NODE_MODE",
+        "PROTOCORE_NO_OPERATOR",
         "PROTOCORE_CHAIN_ID",
         "PROTOCORE_P2P_LISTEN",
         "PROTOCORE_RPC_LISTEN",
@@ -486,7 +525,8 @@ static void write_peer_list(FILE *out, const char *peers) {
     fputc(']', out);
 }
 
-static int write_first_boot_config(const char *path, const char *passphrase_file) {
+static int write_first_boot_config(const char *path, const char *passphrase_file,
+                                   int operator_enabled) {
     const char *chain_id = env_or_default("PROTOCORE_CHAIN_ID", "69420");
     const char *p2p_listen = env_or_default("PROTOCORE_P2P_LISTEN", "/ip4/0.0.0.0/tcp/29898");
     const char *p2p_peers = getenv("PROTOCORE_P2P_PEERS");
@@ -513,14 +553,16 @@ static int write_first_boot_config(const char *path, const char *passphrase_file
     }
 
     fprintf(out,
-            "# protocore node config - Monarch OS full node\n\n"
+            "# protocore node config - Monarch OS %s node\n\n"
             "[node]\n"
-            "mode = \"full\"\n\n"
+            "mode = \"%s\"\n\n"
             "[consensus]\n"
             "chain_id = %s\n"
             "round_duration_ms = 3000\n\n"
             "[p2p]\n"
             "listen = ",
+            operator_enabled ? "operator" : "full",
+            operator_enabled ? "operator" : "full",
             chain_id);
     write_quoted(out, p2p_listen);
     fputs("\npeers = ", out);
@@ -562,6 +604,48 @@ static void append_optional(char **argv, size_t *idx, const char *flag, const ch
     }
 }
 
+static int operator_consensus_key_exists(const char *home) {
+    char sealed_path[768];
+    char plaintext_path[768];
+
+    snprintf(sealed_path, sizeof(sealed_path), "%s/operator/consensus.key.enc", home);
+    snprintf(plaintext_path, sizeof(plaintext_path), "%s/operator/consensus.key", home);
+    return access(sealed_path, F_OK) == 0 || access(plaintext_path, F_OK) == 0;
+}
+
+static int run_operator_keygen(const char *home, const char *network, const char *passphrase_path) {
+    char passphrase[4096];
+
+    if (read_file_trimmed(passphrase_path, passphrase, sizeof(passphrase),
+                          "PROTOCORE_KEYSTORE_PASSPHRASE_FILE") != 0) {
+        return -1;
+    }
+    if (!passphrase[0]) {
+        fprintf(stderr, "keystore passphrase file is empty\n");
+        wipe_bytes(passphrase, sizeof(passphrase));
+        return -1;
+    }
+    if (setenv("PROTOCORE_KEYSTORE_PASSPHRASE", passphrase, 1) != 0) {
+        perror("setenv PROTOCORE_KEYSTORE_PASSPHRASE");
+        wipe_bytes(passphrase, sizeof(passphrase));
+        return -1;
+    }
+    wipe_bytes(passphrase, sizeof(passphrase));
+
+    char *keygen_argv[] = {
+        "./protocore",
+        "--home", (char *)home,
+        "--network", (char *)network,
+        "--output", "json",
+        "--yes",
+        "registry", "gen-operator-keys",
+        NULL,
+    };
+    int rc = run_and_wait(keygen_argv, "protocore registry gen-operator-keys");
+    unsetenv("PROTOCORE_KEYSTORE_PASSPHRASE");
+    return rc;
+}
+
 int main(void) {
     const char *home = env_or_default("PROTOCORE_HOME", "/var/lib/protocore");
     const char *network = env_or_default("PROTOCORE_NETWORK", "testnet");
@@ -579,6 +663,11 @@ int main(void) {
     snprintf(config_path, sizeof(config_path), "%s/config.toml", home);
     snprintf(genesis_path, sizeof(genesis_path), "%s/genesis.toml", home);
 
+    int operator_enabled = resolve_operator_mode();
+    if (operator_enabled < 0) {
+        return 1;
+    }
+
     if (verify_provisioning_policy() != 0) {
         return 1;
     }
@@ -591,7 +680,8 @@ int main(void) {
      * PROTOCORE_KEYSTORE_PASSPHRASE env stays rejected by
      * reject_inline_secret_envs). With no operator file, a per-node passphrase
      * is auto-generated under <home>/keystore and persisted on the STATE
-     * partition so a default full-node image boots with no secret material. */
+     * partition so a default operator image boots with no shipped secret
+     * material. */
     char passphrase_path[640];
     const char *pp_file_env = getenv("PROTOCORE_KEYSTORE_PASSPHRASE_FILE");
     if (pp_file_env && pp_file_env[0]) {
@@ -621,7 +711,7 @@ int main(void) {
             "--output", "json",
             "--yes",
             "init", (char *)network,
-            "--no-operator",
+            operator_enabled ? "--operator" : "--no-operator",
             "--force",
             NULL,
         };
@@ -629,7 +719,15 @@ int main(void) {
         if (run_and_wait(init_argv, "protocore init") != 0) {
             return 1;
         }
-        if (write_first_boot_config(config_path, passphrase_path) != 0) {
+        if (operator_enabled) {
+            if (operator_consensus_key_exists(home)) {
+                fprintf(stderr,
+                        "operator consensus key already present; preserving existing identity\n");
+            } else if (run_operator_keygen(home, network, passphrase_path) != 0) {
+                return 1;
+            }
+        }
+        if (write_first_boot_config(config_path, passphrase_path, operator_enabled) != 0) {
             return 1;
         }
     }

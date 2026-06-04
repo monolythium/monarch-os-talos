@@ -715,6 +715,8 @@ check_provisioning_policy() {
   fi
   grep -Fx "    - PROTOCORE_REQUIRE_TPM_BINDING=$tpm_required" <<<"$service_config" >/dev/null \
     || fail "protocore service config does not pin TPM binding requirement: $tpm_required"
+  grep -Fx "    - PROTOCORE_NODE_MODE=$(jq -r '.provisioning_policy.default_node_role' "$metadata_path")" <<<"$service_config" >/dev/null \
+    || fail "protocore service config does not pin node mode"
   if [[ "$tpm_required" == "true" ]]; then
     grep -Fx "    - PROTOCORE_TPM_QUOTE_FILE=$tpm_quote_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin TPM quote file: $tpm_quote_path"

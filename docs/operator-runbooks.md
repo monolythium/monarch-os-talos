@@ -106,7 +106,7 @@ talosctl gen config monarch-node https://<node-ip>:6443 \
 Merge the `monarch-protocore` extension service config into the generated
 machine config. Start from
 [`examples/protocore-extension-service-config.yaml`](../examples/protocore-extension-service-config.yaml).
-Do not place passphrases, mnemonics, private keys, BLS shares, cluster shares,
+Do not place passphrases, mnemonics, private keys, key shares,
 or credential-bearing database URLs directly in `environment:`.
 
 Apply the config through the Talos maintenance API:
@@ -171,11 +171,11 @@ The command receives `MONARCH_ENROLLMENT_INPUT_MANIFEST` and must write
 DAG round, quorum hash, calldata hash, and canonical attestation payload hash.
 The default strict runner also requires hardware TPM and local TPM evidence.
 
-For operator-signing nodes, the manifest must describe a 10-member cluster with
+For operator nodes, the manifest must describe a 10-member cluster with
 a 7-of-10 signing threshold, an active or standby operator index, a DKG epoch,
 TPM PCR quote references, quote/event-log hashes, PCR policy hash, and file
-references under `/var/lib/protocore` for operator identity, BLS share, cluster
-key share, DKG transcript, and TPM-sealed BLS share. Hardware TPM manifests must
+references under `/var/lib/protocore` for operator identity, cluster
+key share, DKG transcript, and TPM-sealed share. Hardware TPM manifests must
 also include `tpm2_checkquote` verifier inputs. Mainnet operator-signing
 manifests must use hardware TPM 2.0, not the testnet vTPM mode, and must include
 `on_chain_registration` binding the registry contract, operator, cluster,
@@ -186,10 +186,13 @@ the canonical attestation payload hash to the manifest.
 The service config should pin these startup gates:
 
 ```yaml
+- PROTOCORE_NODE_MODE=operator
 - PROTOCORE_EXPECTED_DIGEST_FILE=/var/lib/protocore/enrollment/protocore.sha256
 - PROTOCORE_REQUIRE_ENROLLMENT=true
 - PROTOCORE_ENROLLMENT_FILE=/var/lib/protocore/enrollment/enrollment.json
 ```
+
+Use `PROTOCORE_NODE_MODE=full` only for a non-signing RPC/indexer node. The default operator mode creates and seals the node's ML-DSA operator consensus identity on first boot.
 
 For signing nodes with TPM-bound key shares, enable:
 
@@ -206,7 +209,7 @@ secret file references are missing.
 
 Release QEMU smoke rehearses this gate with synthetic testnet-only material:
 `make smoke-qemu-config` stages an operator-signing enrollment manifest, digest
-file, vTPM quote/event-log, TPM-sealed BLS-share file, and DKG transcript into
+file, vTPM quote/event-log, TPM-sealed share file, and DKG transcript into
 the generated Talos machine config. The release verifier requires
 `REQUIRE_ENROLLMENT_RUNTIME_PROOF=true` and
 `REQUIRE_TPM_BINDING_RUNTIME_PROOF=true` for testnet promotion, so the same
