@@ -86,7 +86,7 @@ jq -S -n \
         quote_nonce: $h3,
         sealed_key_policy: {
           pcrs: [0, 2, 4, 7],
-          key_share_refs: ["tpm_sealed_bls_share"],
+          key_share_refs: ["lythiumseal_operator_key"],
           policy_digest: $h4,
           dkg_transcript_sha256: $h5,
           sealed_share_sha256: $h6
@@ -98,6 +98,7 @@ jq -S -n \
       bls_share: "/var/lib/protocore/secrets/bls-share",
       cluster_key_share: "/var/lib/protocore/secrets/cluster-key-share",
       dkg_transcript: "/var/lib/protocore/secrets/dkg-transcript.json",
+      lythiumseal_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
       tpm_sealed_bls_share: "/var/lib/protocore/secrets/bls-share.sealed"
     }
   }' >"$input_manifest"

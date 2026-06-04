@@ -44,14 +44,15 @@ Operator-signing manifests must include:
   `0`, `2`, `4`, and `7`, quote/event-log file paths, quote/event-log
   SHA-256 hashes, a quote nonce, and the PCR policy digest used to seal key
   shares
-- `attestation.tpm.sealed_key_policy`, including `tpm_sealed_bls_share` in
-  `key_share_refs`, the PCR policy digest, the DKG transcript hash, and the
-  TPM-sealed BLS-share hash
+- `attestation.tpm.sealed_key_policy`, including `lythiumseal_operator_key`
+  in `key_share_refs`, the PCR policy digest, the key transcript hash, and
+  the staged LythiumSeal operator-key hash
 - `attestation.tpm.quote_verification` for hardware TPM nodes, including the
   `tpm2_checkquote` tool binding, AK public key file, quote-signature file,
   PCR digest file, and SHA-256 hashes for those verifier inputs
 - `secret_files.operator_identity_key`, `secret_files.bls_share`,
-  `secret_files.cluster_key_share`, `secret_files.dkg_transcript`, and
+  `secret_files.cluster_key_share`, `secret_files.dkg_transcript`,
+  `secret_files.lythiumseal_operator_key`, and the compatibility alias
   `secret_files.tpm_sealed_bls_share`, all as file paths under
   `/var/lib/protocore`
 
@@ -66,8 +67,8 @@ certificate hash, `registration_method = "register"`, the node-registry
 `register(bytes32,string,bytes32,uint32,uint32,bytes,bytes,bytes)` selector
 `0xf4896df2`, registration calldata hash,
 `attestation_embedded_in_registration = true`, and the exact release digest,
-TPM quote hash, event-log hash, PCR policy hash, DKG transcript hash,
-sealed-share hash, and attestation payload hash submitted to the registry. The
+TPM quote hash, event-log hash, PCR policy hash, key transcript hash,
+LythiumSeal operator-key hash, and attestation payload hash submitted to the registry. The
 local validator checks that the on-chain cluster/operator fields and
 attestation evidence hashes match the rest of the manifest, recomputes the canonical
 `monarch-protocore-operator-attestation-payload/v1` SHA-256 hash, and checks
@@ -111,13 +112,13 @@ Set strict mode to `false` only for testnet rehearsals.
 
 `make validate-tpm-attestation-evidence` resolves each `/var/lib/protocore/...`
 path under `LOCAL_EVIDENCE_ROOT`, verifies that the quote, event log,
-TPM-sealed BLS share, DKG transcript, and hardware quote verifier files hash to
+LythiumSeal operator key, key transcript, and hardware quote verifier files hash to
 the manifest values, and runs `tpm2_checkquote` for `hardware-tpm2` manifests by
 default. Set `REQUIRE_TPM2_CHECKQUOTE=false` only for synthetic rehearsal
 bundles that do not contain a real TPM quote signature.
 
-`make validate-tpm-sealing-evidence` is the companion proof that the sealed BLS
-share was produced by a TPM policy-bound sealing flow. It validates
+`make validate-tpm-sealing-evidence` is the companion proof that the sealed
+operator key was produced by a TPM policy-bound sealing flow. It validates
 `monarch-protocore-tpm-sealing-evidence/v1`, binds the seal record back to the
 operator enrollment and key-share ceremony when those manifests are supplied,
 hash-checks the staged quote/event-log, DKG transcript, sealed share, TPM2
@@ -131,13 +132,14 @@ operator-signing nodes:
 - PROTOCORE_REQUIRE_TPM_BINDING=true
 - PROTOCORE_TPM_QUOTE_FILE=/var/lib/protocore/attestation/quote.bin
 - PROTOCORE_TPM_EVENT_LOG_FILE=/var/lib/protocore/attestation/eventlog.bin
-- PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/secrets/bls-share.sealed
+- PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
 - PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/dkg-transcript.json
+- PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
 ```
 
 When enabled, startup requires enrollment, release digest evidence, TPM quote
-evidence, a TPM-sealed BLS share, and a DKG transcript. Final key rotation and
-recovery ceremonies are still tracked in the readiness docs.
+evidence, a staged LythiumSeal operator key, and a key transcript. Final key
+rotation and recovery ceremonies are still tracked in the readiness docs.
 
 The QEMU release smoke path exercises the same file contract. When
 `PROTOCORE_REQUIRE_ENROLLMENT=true`, `make smoke-qemu-config` writes a
@@ -146,5 +148,5 @@ the generated Talos machine config, and `smoke-qemu` can be run with
 `REQUIRE_ENROLLMENT_RUNTIME_PROOF=true` and
 `REQUIRE_TPM_BINDING_RUNTIME_PROOF=true`. Those gates prove, through Talos API
 reads from the booted node, that the manifest, release digest, TPM quote/event
-log, TPM-sealed BLS share, and DKG transcript are present before the release
+log, LythiumSeal operator key, and key transcript are present before the release
 artifact verifier accepts the smoke result.

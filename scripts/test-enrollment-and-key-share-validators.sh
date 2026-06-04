@@ -262,7 +262,7 @@ jq -n \
         quote_nonce: $h3,
         sealed_key_policy: {
           pcrs: [0, 2, 4, 7],
-          key_share_refs: ["tpm_sealed_bls_share"],
+          key_share_refs: ["lythiumseal_operator_key"],
           policy_digest: $h4,
           dkg_transcript_sha256: $h5,
           sealed_share_sha256: $h6
@@ -274,6 +274,7 @@ jq -n \
       bls_share: "/var/lib/protocore/secrets/bls-share",
       cluster_key_share: "/var/lib/protocore/secrets/cluster-key-share",
       dkg_transcript: "/var/lib/protocore/secrets/dkg-transcript.json",
+      lythiumseal_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
       tpm_sealed_bls_share: "/var/lib/protocore/secrets/bls-share.sealed"
     }
   }' >"$valid_enrollment"
@@ -295,15 +296,16 @@ expect_fail missing-sealed-share-ref \
 evidence_root="$tmp_dir/evidence-root"
 mkdir -p \
   "$evidence_root/var/lib/protocore/attestation" \
-  "$evidence_root/var/lib/protocore/secrets"
+  "$evidence_root/var/lib/protocore/secrets" \
+  "$evidence_root/var/lib/protocore/operator/threshold"
 printf 'quote-evidence\n' >"$evidence_root/var/lib/protocore/attestation/quote.bin"
 printf 'event-log-evidence\n' >"$evidence_root/var/lib/protocore/attestation/eventlog.bin"
 printf 'dkg-transcript-evidence\n' >"$evidence_root/var/lib/protocore/secrets/dkg-transcript.json"
-printf 'sealed-bls-share-evidence\n' >"$evidence_root/var/lib/protocore/secrets/bls-share.sealed"
+printf 'lythiumseal-operator-key-evidence\n' >"$evidence_root/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
 quote_actual="$(sha256sum "$evidence_root/var/lib/protocore/attestation/quote.bin" | awk '{print $1}')"
 event_log_actual="$(sha256sum "$evidence_root/var/lib/protocore/attestation/eventlog.bin" | awk '{print $1}')"
 dkg_actual="$(sha256sum "$evidence_root/var/lib/protocore/secrets/dkg-transcript.json" | awk '{print $1}')"
-sealed_actual="$(sha256sum "$evidence_root/var/lib/protocore/secrets/bls-share.sealed" | awk '{print $1}')"
+sealed_actual="$(sha256sum "$evidence_root/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc" | awk '{print $1}')"
 jq \
   --arg quote_actual "$quote_actual" \
   --arg event_log_actual "$event_log_actual" \

@@ -393,7 +393,7 @@ jq -n \
         quote_nonce: $h5,
         sealed_key_policy: {
           pcrs: [0, 2, 4, 7],
-          key_share_refs: ["tpm_sealed_bls_share"],
+          key_share_refs: ["lythiumseal_operator_key"],
           policy_digest: $h3,
           dkg_transcript_sha256: $dkg_hash,
           sealed_share_sha256: $sealed_share_hash
@@ -405,6 +405,7 @@ jq -n \
       bls_share: "/var/lib/protocore/secrets/bls-share",
       cluster_key_share: "/var/lib/protocore/secrets/cluster-key-share",
       dkg_transcript: "/var/lib/protocore/secrets/dkg-transcript-next.json",
+      lythiumseal_operator_key: "/var/lib/protocore/secrets/share-2.sealed",
       tpm_sealed_bls_share: "/var/lib/protocore/secrets/share-2.sealed"
     }
   }' >"$valid_enrollment"

@@ -397,6 +397,7 @@
               "bls_share",
               "cluster_key_share",
               "dkg_transcript",
+              "lythiumseal_operator_key",
               "tpm_sealed_bls_share"
             ]
           }

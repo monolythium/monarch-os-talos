@@ -175,7 +175,7 @@ check_smoke_qemu() {
       || fail "enrollment runtime proof did not verify TPM mode"
     jq -e '.tpm.pcrs | sort == [0, 2, 4, 7]' "$enrollment_log" >/dev/null \
       || fail "enrollment runtime proof did not verify TPM PCR policy"
-    jq -e '.file_hashes | map(.label) | index("tpm_quote") and index("tpm_event_log") and index("tpm_sealed_bls_share") and index("dkg_transcript")' "$enrollment_log" >/dev/null \
+    jq -e '.file_hashes | map(.label) | index("tpm_quote") and index("tpm_event_log") and index("lythiumseal_operator_key") and index("dkg_transcript")' "$enrollment_log" >/dev/null \
       || fail "enrollment runtime proof lacks TPM/DKG file evidence"
     jq -e '
       def norm: ascii_downcase | ltrimstr("0x");
@@ -188,7 +188,7 @@ check_smoke_qemu() {
       and (.tpm.sealed_share_sha256 | test("^(0x)?[0-9a-fA-F]{64}$"))
       and any($root.file_hashes[]; .label == "tpm_quote" and (.sha256 | norm) == ($root.tpm.quote_sha256 | norm))
       and any($root.file_hashes[]; .label == "tpm_event_log" and (.sha256 | norm) == ($root.tpm.event_log_sha256 | norm))
-      and any($root.file_hashes[]; .label == "tpm_sealed_bls_share" and (.sha256 | norm) == ($root.tpm.sealed_share_sha256 | norm))
+      and any($root.file_hashes[]; .label == "lythiumseal_operator_key" and (.sha256 | norm) == ($root.tpm.sealed_share_sha256 | norm))
       and any($root.file_hashes[]; .label == "dkg_transcript" and (.sha256 | norm) == ($root.tpm.dkg_transcript_sha256 | norm))
     ' "$enrollment_log" >/dev/null \
       || fail "enrollment runtime proof does not bind TPM/DKG file hashes to manifest claims"
@@ -487,6 +487,9 @@ check_provisioning_policy() {
   tpm_event_log_path="$(jq -r '.provisioning_policy.tpm_binding.event_log_file_path // ""' "$metadata_path")"
   tpm_sealed_env="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_env // ""' "$metadata_path")"
   tpm_sealed_path="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_path // ""' "$metadata_path")"
+  local lythiumseal_env lythiumseal_path
+  lythiumseal_env="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_env // ""' "$metadata_path")"
+  lythiumseal_path="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_path // ""' "$metadata_path")"
   dkg_env="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_env // ""' "$metadata_path")"
   dkg_path="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_path // ""' "$metadata_path")"
   tpm_quote_validator="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.validator // ""' "$metadata_path")"
@@ -610,8 +613,14 @@ check_provisioning_policy() {
   [[ "$tpm_sealed_env" == "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" ]] \
     || fail "provisioning policy TPM sealed BLS share file env mismatch: $tpm_sealed_env"
   if [[ "$tpm_required" == "true" ]]; then
-    [[ "$tpm_sealed_path" == "/var/lib/protocore/secrets/bls-share.sealed" ]] \
-      || fail "provisioning policy TPM sealed BLS share file path mismatch: $tpm_sealed_path"
+    [[ "$tpm_sealed_path" == "$lythiumseal_path" ]] \
+      || fail "provisioning policy TPM sealed share alias must match LythiumSeal key path: sealed=$tpm_sealed_path lythiumseal=$lythiumseal_path"
+  fi
+  [[ "$lythiumseal_env" == "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" ]] \
+    || fail "provisioning policy LythiumSeal operator key env mismatch: $lythiumseal_env"
+  if [[ "$tpm_required" == "true" ]]; then
+    [[ "$lythiumseal_path" == "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc" ]] \
+      || fail "provisioning policy LythiumSeal operator key path mismatch: $lythiumseal_path"
   fi
   [[ "$dkg_env" == "PROTOCORE_DKG_TRANSCRIPT_FILE" ]] \
     || fail "provisioning policy DKG transcript file env mismatch: $dkg_env"
@@ -723,9 +732,11 @@ check_provisioning_policy() {
     grep -Fx "    - PROTOCORE_TPM_EVENT_LOG_FILE=$tpm_event_log_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin TPM event-log file: $tpm_event_log_path"
     grep -Fx "    - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=$tpm_sealed_path" <<<"$service_config" >/dev/null \
-      || fail "protocore service config does not pin TPM-sealed BLS share file: $tpm_sealed_path"
+      || fail "protocore service config does not pin TPM-sealed share compatibility alias: $tpm_sealed_path"
     grep -Fx "    - PROTOCORE_DKG_TRANSCRIPT_FILE=$dkg_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin DKG transcript file: $dkg_path"
+    grep -Fx "    - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=$lythiumseal_path" <<<"$service_config" >/dev/null \
+      || fail "protocore service config does not pin LythiumSeal operator key file: $lythiumseal_path"
   fi
 
   mapfile -t forbidden < <(jq -r '.provisioning_policy.prohibited_inline_secret_env[]?' "$metadata_path")

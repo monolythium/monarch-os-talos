@@ -333,7 +333,7 @@ static int verify_protocore_release(void) {
     return run_and_wait(verify_argv, "protocore release verify");
 }
 
-static int verify_provisioning_policy(void) {
+static int verify_provisioning_policy(int operator_enabled) {
     const char *expected_digest = getenv("PROTOCORE_EXPECTED_DIGEST");
     const char *expected_digest_file = getenv("PROTOCORE_EXPECTED_DIGEST_FILE");
     const char *enrollment_file = env_or_default("PROTOCORE_ENROLLMENT_FILE", "/var/lib/protocore/enrollment/enrollment.json");
@@ -343,6 +343,9 @@ static int verify_provisioning_policy(void) {
     const char *tpm_event_log_file = getenv("PROTOCORE_TPM_EVENT_LOG_FILE");
     const char *tpm_sealed_bls_share_file = getenv("PROTOCORE_TPM_SEALED_BLS_SHARE_FILE");
     const char *dkg_transcript_file = getenv("PROTOCORE_DKG_TRANSCRIPT_FILE");
+    const char *lythiumseal_operator_key_file = env_or_default(
+        "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
+        "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc");
     const char *postgres_url = getenv("PROTOCORE_INDEXER_POSTGRES_URL");
     const char *postgres_url_file = getenv("PROTOCORE_INDEXER_POSTGRES_URL_FILE");
 
@@ -368,6 +371,7 @@ static int verify_provisioning_policy(void) {
         "PROTOCORE_TPM_EVENT_LOG_FILE",
         "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE",
         "PROTOCORE_DKG_TRANSCRIPT_FILE",
+        "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
         NULL,
     };
     for (const char **name = placeholder_checked; *name; ++name) {
@@ -413,6 +417,11 @@ static int verify_provisioning_policy(void) {
             require_readable_file(tpm_event_log_file, "PROTOCORE_TPM_EVENT_LOG_FILE") != 0 ||
             require_readable_file(tpm_sealed_bls_share_file, "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE") != 0 ||
             require_readable_file(dkg_transcript_file, "PROTOCORE_DKG_TRANSCRIPT_FILE") != 0) {
+            return -1;
+        }
+        if (operator_enabled &&
+            require_readable_file(lythiumseal_operator_key_file,
+                                  "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE") != 0) {
             return -1;
         }
         if (!is_truthy(require_enrollment)) {
@@ -668,7 +677,7 @@ int main(void) {
         return 1;
     }
 
-    if (verify_provisioning_policy() != 0) {
+    if (verify_provisioning_policy(operator_enabled) != 0) {
         return 1;
     }
     if (verify_protocore_release() != 0) {

@@ -278,9 +278,9 @@ if [[ "$role" == "operator-signing" ]]; then
   done
   jq -e '
     (.attestation.tpm.sealed_key_policy.key_share_refs // [])
-    | index("tpm_sealed_bls_share")
+    | index("lythiumseal_operator_key")
   ' "$MANIFEST" >/dev/null \
-    || fail "attestation.tpm.sealed_key_policy.key_share_refs must include tpm_sealed_bls_share"
+    || fail "attestation.tpm.sealed_key_policy.key_share_refs must include lythiumseal_operator_key"
 
   if [[ "$tpm_mode" == "hardware-tpm2" ]]; then
     [[ "$quote_verification_present" == "true" ]] \
@@ -305,7 +305,7 @@ if [[ "$role" == "operator-signing" ]]; then
     fail "attestation.tpm.quote_verification is only allowed with hardware-tpm2"
   fi
 
-  for key in operator_identity_key bls_share cluster_key_share dkg_transcript tpm_sealed_bls_share; do
+  for key in operator_identity_key bls_share cluster_key_share dkg_transcript lythiumseal_operator_key tpm_sealed_bls_share; do
     path="$(jq -r --arg key "$key" '.secret_files[$key] // ""' "$MANIFEST")"
     validate_file_ref "secret_files.$key" "$path"
   done

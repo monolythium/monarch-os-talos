@@ -33,6 +33,11 @@ PROTOCORE_TPM_QUOTE_FILE="${PROTOCORE_TPM_QUOTE_FILE:-}"
 PROTOCORE_TPM_EVENT_LOG_FILE="${PROTOCORE_TPM_EVENT_LOG_FILE:-}"
 PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-}"
 PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-}"
+PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-}"
+if [[ "$PROTOCORE_REQUIRE_TPM_BINDING" == "true" ]]; then
+  PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc}"
+  PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE}"
+fi
 DM_VERITY_EXPECTED_ROOT_HASHES="${DM_VERITY_EXPECTED_ROOT_HASHES:-}"
 
 [[ "$OUT_DIR" = /* ]] || OUT_DIR="$ROOT_DIR/$OUT_DIR"
@@ -224,6 +229,7 @@ jq -s \
   --arg protocore_tpm_event_log_file "$PROTOCORE_TPM_EVENT_LOG_FILE" \
   --arg protocore_tpm_sealed_bls_share_file "$PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" \
   --arg protocore_dkg_transcript_file "$PROTOCORE_DKG_TRANSCRIPT_FILE" \
+  --arg protocore_lythiumseal_operator_key_file "$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" \
   --argjson genesis_embedded "$(bool_json "$([[ -f "$GENESIS_TOML" ]] && printf true || printf false)")" \
   --argjson upgrade_requires_same_channel "$(bool_json "$UPGRADE_REQUIRES_SAME_CHANNEL")" \
   --arg state_migration_mode "$STATE_MIGRATION_MODE" \
@@ -349,6 +355,8 @@ jq -s \
         sealed_bls_share_file_path: $protocore_tpm_sealed_bls_share_file,
         dkg_transcript_file_env: "PROTOCORE_DKG_TRANSCRIPT_FILE",
         dkg_transcript_file_path: $protocore_dkg_transcript_file,
+        lythiumseal_operator_key_file_env: "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
+        lythiumseal_operator_key_file_path: $protocore_lythiumseal_operator_key_file,
         required_for_operator_signing: true,
         quote_verification: {
           validator: "scripts/validate-tpm-attestation-evidence.sh",
@@ -429,7 +437,8 @@ jq -s \
         "PROTOCORE_TPM_QUOTE_FILE",
         "PROTOCORE_TPM_EVENT_LOG_FILE",
         "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE",
-        "PROTOCORE_DKG_TRANSCRIPT_FILE"
+        "PROTOCORE_DKG_TRANSCRIPT_FILE",
+        "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE"
       ]
     },
     incident_response_policy: {

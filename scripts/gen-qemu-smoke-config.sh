@@ -22,8 +22,9 @@ PROTOCORE_EXPECTED_DIGEST_FILE="${PROTOCORE_EXPECTED_DIGEST_FILE:-/var/lib/proto
 PROTOCORE_REQUIRE_TPM_BINDING="${PROTOCORE_REQUIRE_TPM_BINDING:-false}"
 PROTOCORE_TPM_QUOTE_FILE="${PROTOCORE_TPM_QUOTE_FILE:-/var/lib/protocore/attestation/quote.bin}"
 PROTOCORE_TPM_EVENT_LOG_FILE="${PROTOCORE_TPM_EVENT_LOG_FILE:-/var/lib/protocore/attestation/eventlog.bin}"
-PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-/var/lib/protocore/secrets/bls-share.sealed}"
 PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-/var/lib/protocore/secrets/dkg-transcript.json}"
+PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc}"
+PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE}"
 SMOKE_ENROLLMENT_BUNDLE="${SMOKE_ENROLLMENT_BUNDLE:-auto}"
 RELEASE_METADATA_FILE="${RELEASE_METADATA_FILE:-"$OUT_DIR/monarch-os-talos-$TALOS_VERSION-$ARCH.release.json"}"
 
@@ -125,7 +126,7 @@ if [[ "$enrollment_bundle_required" == "true" ]]; then
   bls_share_file="$enrollment_dir/bls-share"
   cluster_key_share_file="$enrollment_dir/cluster-key-share"
   dkg_transcript_file="$enrollment_dir/dkg-transcript.json"
-  sealed_bls_share_file="$enrollment_dir/bls-share.sealed"
+  lythiumseal_operator_key_file="$enrollment_dir/lythiumseal-operator-key.bin.enc"
 
   printf '%s\n' "$digest" >"$digest_file"
   printf 'monarch-smoke-vtpm-quote:%s\n' "$digest" >"$quote_file"
@@ -133,7 +134,7 @@ if [[ "$enrollment_bundle_required" == "true" ]]; then
   printf 'operator-identity-key-ref:%s\n' "$digest" >"$operator_identity_file"
   printf 'bls-share-ref:%s\n' "$digest" >"$bls_share_file"
   printf 'cluster-key-share-ref:%s\n' "$digest" >"$cluster_key_share_file"
-  printf 'tpm-sealed-bls-share-ref:%s\n' "$digest" >"$sealed_bls_share_file"
+  printf 'lythiumseal-operator-key-ref:%s\n' "$digest" >"$lythiumseal_operator_key_file"
   jq -n \
     --arg digest "$digest" \
     --arg chain_profile "$CHAIN_PROFILE" \
@@ -148,11 +149,11 @@ if [[ "$enrollment_bundle_required" == "true" ]]; then
 
   quote_sha256="$(sha256sum "$quote_file" | awk '{print $1}')"
   event_log_sha256="$(sha256sum "$event_log_file" | awk '{print $1}')"
-  sealed_bls_share_sha256="$(sha256sum "$sealed_bls_share_file" | awk '{print $1}')"
+  lythiumseal_operator_key_sha256="$(sha256sum "$lythiumseal_operator_key_file" | awk '{print $1}')"
   dkg_transcript_sha256="$(sha256sum "$dkg_transcript_file" | awk '{print $1}')"
   quote_nonce="$(printf 'monarch-smoke-vtpm-nonce:%s\n' "$digest" | sha256sum | awk '{print $1}')"
   pcr_policy_hash="$(
-    printf 'sha256:0=%s:2=%s:4=%s:7=%s:key=tpm_sealed_bls_share\n' \
+    printf 'sha256:0=%s:2=%s:4=%s:7=%s:key=lythiumseal_operator_key\n' \
       "0000000000000000000000000000000000000000000000000000000000000000" \
       "2222222222222222222222222222222222222222222222222222222222222222" \
       "4444444444444444444444444444444444444444444444444444444444444444" \
@@ -174,10 +175,11 @@ if [[ "$enrollment_bundle_required" == "true" ]]; then
     --arg quote_nonce "$quote_nonce" \
     --arg pcr_policy_hash "$pcr_policy_hash" \
     --arg dkg_transcript_sha256 "$dkg_transcript_sha256" \
-    --arg sealed_bls_share_sha256 "$sealed_bls_share_sha256" \
+    --arg lythiumseal_operator_key_sha256 "$lythiumseal_operator_key_sha256" \
     --arg rpc_listen "$PROTOCORE_RPC_LISTEN" \
     --arg p2p_listen "$PROTOCORE_P2P_LISTEN" \
     --arg discovery "$PROTOCORE_DISCOVERY" \
+    --arg lythiumseal_operator_key_file "$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" \
     '{
       schema_version: "monarch-protocore-enrollment/v1",
       node: {
@@ -224,10 +226,10 @@ if [[ "$enrollment_bundle_required" == "true" ]]; then
           quote_nonce: $quote_nonce,
           sealed_key_policy: {
             pcrs: [0, 2, 4, 7],
-            key_share_refs: ["tpm_sealed_bls_share"],
+            key_share_refs: ["lythiumseal_operator_key"],
             policy_digest: $pcr_policy_hash,
             dkg_transcript_sha256: $dkg_transcript_sha256,
-            sealed_share_sha256: $sealed_bls_share_sha256
+            sealed_share_sha256: $lythiumseal_operator_key_sha256
           }
         }
       },
@@ -236,6 +238,7 @@ if [[ "$enrollment_bundle_required" == "true" ]]; then
         bls_share: "/var/lib/protocore/secrets/bls-share",
         cluster_key_share: "/var/lib/protocore/secrets/cluster-key-share",
         dkg_transcript: $dkg_transcript_file,
+        lythiumseal_operator_key: $lythiumseal_operator_key_file,
         tpm_sealed_bls_share: $sealed_bls_share_file
       }
     }' >"$manifest_file"
@@ -255,7 +258,10 @@ EOF_FILES_PATCH
   write_machine_file_patch_item "/var/lib/protocore/secrets/bls-share" "0o600" "$bls_share_file" >>"$machine_files_patch"
   write_machine_file_patch_item "/var/lib/protocore/secrets/cluster-key-share" "0o600" "$cluster_key_share_file" >>"$machine_files_patch"
   write_machine_file_patch_item "$PROTOCORE_DKG_TRANSCRIPT_FILE" "0o600" "$dkg_transcript_file" >>"$machine_files_patch"
-  write_machine_file_patch_item "$PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" "0o600" "$sealed_bls_share_file" >>"$machine_files_patch"
+  write_machine_file_patch_item "$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" "0o600" "$lythiumseal_operator_key_file" >>"$machine_files_patch"
+  if [[ "$PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" != "$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" ]]; then
+    write_machine_file_patch_item "$PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" "0o600" "$lythiumseal_operator_key_file" >>"$machine_files_patch"
+  fi
 else
   rm -f "$machine_files_patch"
 fi
@@ -274,6 +280,7 @@ $(if bool_true "$PROTOCORE_REQUIRE_TPM_BINDING"; then printf '  - PROTOCORE_TPM_
 $(if bool_true "$PROTOCORE_REQUIRE_TPM_BINDING"; then printf '  - PROTOCORE_TPM_EVENT_LOG_FILE=%s\n' "$PROTOCORE_TPM_EVENT_LOG_FILE"; fi)
 $(if bool_true "$PROTOCORE_REQUIRE_TPM_BINDING"; then printf '  - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=%s\n' "$PROTOCORE_TPM_SEALED_BLS_SHARE_FILE"; fi)
 $(if bool_true "$PROTOCORE_REQUIRE_TPM_BINDING"; then printf '  - PROTOCORE_DKG_TRANSCRIPT_FILE=%s\n' "$PROTOCORE_DKG_TRANSCRIPT_FILE"; fi)
+$(if bool_true "$PROTOCORE_REQUIRE_TPM_BINDING"; then printf '  - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=%s\n' "$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE"; fi)
   - PROTOCORE_RPC_LISTEN=$PROTOCORE_RPC_LISTEN
   - PROTOCORE_P2P_LISTEN=$PROTOCORE_P2P_LISTEN
   - PROTOCORE_DISCOVERY=$PROTOCORE_DISCOVERY
