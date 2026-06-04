@@ -18,6 +18,61 @@ static int is_truthy(const char *value) {
                      strcmp(value, "yes") == 0 || strcmp(value, "on") == 0);
 }
 
+static int is_decimal_uint(const char *value, int require_positive) {
+    if (!value || !value[0]) {
+        return 0;
+    }
+    for (const char *p = value; *p; ++p) {
+        if (*p < '0' || *p > '9') {
+            return 0;
+        }
+    }
+    if (require_positive) {
+        errno = 0;
+        unsigned long long parsed = strtoull(value, NULL, 10);
+        if (errno != 0 || parsed == 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int lythiumseal_keygen_requested(void) {
+    const char *generate = getenv("PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY");
+    const char *index = getenv("PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX");
+    const char *epoch = getenv("PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH");
+
+    if (generate && generate[0]) {
+        return is_truthy(generate);
+    }
+
+    return index && index[0] && epoch && epoch[0];
+}
+
+static int validate_lythiumseal_keygen_env(void) {
+    const char *generate = getenv("PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY");
+    const char *index = getenv("PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX");
+    const char *epoch = getenv("PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH");
+
+    if (!lythiumseal_keygen_requested()) {
+        return 0;
+    }
+    if (generate && generate[0] && !is_truthy(generate)) {
+        return 0;
+    }
+    if (!is_decimal_uint(index, 1)) {
+        fprintf(stderr,
+                "PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX is required for LythiumSeal keygen and must be a positive decimal integer\n");
+        return -1;
+    }
+    if (!is_decimal_uint(epoch, 0)) {
+        fprintf(stderr,
+                "PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH is required for LythiumSeal keygen and must be a decimal integer\n");
+        return -1;
+    }
+    return 0;
+}
+
 static void wipe_bytes(void *ptr, size_t len) {
     volatile unsigned char *p = (volatile unsigned char *)ptr;
 
@@ -333,7 +388,7 @@ static int verify_protocore_release(void) {
     return run_and_wait(verify_argv, "protocore release verify");
 }
 
-static int verify_provisioning_policy(int operator_enabled) {
+static int verify_provisioning_policy(int operator_enabled, int first_boot, const char *home) {
     const char *expected_digest = getenv("PROTOCORE_EXPECTED_DIGEST");
     const char *expected_digest_file = getenv("PROTOCORE_EXPECTED_DIGEST_FILE");
     const char *enrollment_file = env_or_default("PROTOCORE_ENROLLMENT_FILE", "/var/lib/protocore/enrollment/enrollment.json");
@@ -372,6 +427,9 @@ static int verify_provisioning_policy(int operator_enabled) {
         "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE",
         "PROTOCORE_DKG_TRANSCRIPT_FILE",
         "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
+        "PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY",
+        "PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX",
+        "PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH",
         NULL,
     };
     for (const char **name = placeholder_checked; *name; ++name) {
@@ -402,6 +460,10 @@ static int verify_provisioning_policy(int operator_enabled) {
         return -1;
     }
 
+    if (validate_lythiumseal_keygen_env() != 0) {
+        return -1;
+    }
+
     if (is_truthy(require_enrollment)) {
         if (require_readable_file(enrollment_file, "PROTOCORE_ENROLLMENT_FILE") != 0) {
             return -1;
@@ -420,9 +482,25 @@ static int verify_provisioning_policy(int operator_enabled) {
             return -1;
         }
         if (operator_enabled &&
-            require_readable_file(lythiumseal_operator_key_file,
-                                  "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE") != 0) {
-            return -1;
+            access(lythiumseal_operator_key_file, R_OK) != 0) {
+            if (!(first_boot && lythiumseal_keygen_requested())) {
+                if (require_readable_file(lythiumseal_operator_key_file,
+                                          "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE") != 0) {
+                    return -1;
+                }
+            } else {
+                char generated_path[768];
+                snprintf(generated_path, sizeof(generated_path),
+                         "%s/operator/threshold/lythiumseal-operator-key.bin.enc", home);
+                if (strcmp(lythiumseal_operator_key_file, generated_path) != 0) {
+                    fprintf(stderr,
+                            "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=%s does not match generated key path %s\n",
+                            lythiumseal_operator_key_file, generated_path);
+                    return -1;
+                }
+                fprintf(stderr,
+                        "LythiumSeal operator key not staged; first boot will generate it from PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX/PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH\n");
+            }
         }
         if (!is_truthy(require_enrollment)) {
             fprintf(stderr, "PROTOCORE_REQUIRE_TPM_BINDING requires PROTOCORE_REQUIRE_ENROLLMENT=true\n");
@@ -622,6 +700,17 @@ static int operator_consensus_key_exists(const char *home) {
     return access(sealed_path, F_OK) == 0 || access(plaintext_path, F_OK) == 0;
 }
 
+static int lythiumseal_operator_key_exists(const char *home) {
+    char sealed_path[768];
+    char plaintext_path[768];
+
+    snprintf(sealed_path, sizeof(sealed_path),
+             "%s/operator/threshold/lythiumseal-operator-key.bin.enc", home);
+    snprintf(plaintext_path, sizeof(plaintext_path),
+             "%s/operator/threshold/lythiumseal-operator-key.bin", home);
+    return access(sealed_path, F_OK) == 0 || access(plaintext_path, F_OK) == 0;
+}
+
 static int run_operator_keygen(const char *home, const char *network, const char *passphrase_path) {
     char passphrase[4096];
 
@@ -655,6 +744,50 @@ static int run_operator_keygen(const char *home, const char *network, const char
     return rc;
 }
 
+static int run_lythiumseal_keygen(const char *home, const char *network,
+                                  const char *passphrase_path) {
+    const char *index = getenv("PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX");
+    const char *epoch = getenv("PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH");
+    char passphrase[4096];
+
+    if (validate_lythiumseal_keygen_env() != 0) {
+        return -1;
+    }
+    if (!lythiumseal_keygen_requested()) {
+        return 0;
+    }
+    if (read_file_trimmed(passphrase_path, passphrase, sizeof(passphrase),
+                          "PROTOCORE_KEYSTORE_PASSPHRASE_FILE") != 0) {
+        return -1;
+    }
+    if (!passphrase[0]) {
+        fprintf(stderr, "keystore passphrase file is empty\n");
+        wipe_bytes(passphrase, sizeof(passphrase));
+        return -1;
+    }
+    if (setenv("PROTOCORE_KEYSTORE_PASSPHRASE", passphrase, 1) != 0) {
+        perror("setenv PROTOCORE_KEYSTORE_PASSPHRASE");
+        wipe_bytes(passphrase, sizeof(passphrase));
+        return -1;
+    }
+    wipe_bytes(passphrase, sizeof(passphrase));
+
+    char *keygen_argv[] = {
+        "./protocore",
+        "--home", (char *)home,
+        "--network", (char *)network,
+        "--output", "json",
+        "--yes",
+        "registry", "gen-lythiumseal-key",
+        "--operator-index", (char *)index,
+        "--epoch", (char *)epoch,
+        NULL,
+    };
+    int rc = run_and_wait(keygen_argv, "protocore registry gen-lythiumseal-key");
+    unsetenv("PROTOCORE_KEYSTORE_PASSPHRASE");
+    return rc;
+}
+
 int main(void) {
     const char *home = env_or_default("PROTOCORE_HOME", "/var/lib/protocore");
     const char *network = env_or_default("PROTOCORE_NETWORK", "testnet");
@@ -677,7 +810,8 @@ int main(void) {
         return 1;
     }
 
-    if (verify_provisioning_policy(operator_enabled) != 0) {
+    int first_boot = access(config_path, F_OK) != 0;
+    if (verify_provisioning_policy(operator_enabled, first_boot, home) != 0) {
         return 1;
     }
     if (verify_protocore_release() != 0) {
@@ -711,7 +845,6 @@ int main(void) {
         }
     }
 
-    int first_boot = access(config_path, F_OK) != 0;
     if (first_boot) {
         char *init_argv[] = {
             "./protocore",
@@ -733,6 +866,13 @@ int main(void) {
                 fprintf(stderr,
                         "operator consensus key already present; preserving existing identity\n");
             } else if (run_operator_keygen(home, network, passphrase_path) != 0) {
+                return 1;
+            }
+            if (lythiumseal_operator_key_exists(home)) {
+                fprintf(stderr,
+                        "LythiumSeal operator key already present; preserving existing seal identity\n");
+            } else if (lythiumseal_keygen_requested() &&
+                       run_lythiumseal_keygen(home, network, passphrase_path) != 0) {
                 return 1;
             }
         }

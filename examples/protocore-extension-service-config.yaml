@@ -17,6 +17,11 @@ environment:
   # - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
   # - PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/dkg-transcript.json
   # - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
+  # Optional first-boot generation path. The operator index is 1-based and
+  # must match the cluster seal-recipient slot for the configured epoch.
+  # - PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY=true
+  # - PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX=1
+  # - PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH=0
   - PROTOCORE_NODE_MODE=operator
   - PROTOCORE_P2P_LISTEN=/ip4/0.0.0.0/tcp/29898
   - PROTOCORE_DISCOVERY=hybrid

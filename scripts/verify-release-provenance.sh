@@ -239,6 +239,8 @@ run_rebuild_check() {
   local channel chain_profile chain_id genesis_path desktop_channel desktop_min desktop_max same_channel
   local p2p_listen rpc_listen discovery enrollment_required enrollment_file digest_file tpm_required
   local tpm_quote_file tpm_event_log_file tpm_sealed_bls_share_file dkg_transcript_file
+  local lythiumseal_operator_key_file generate_lythiumseal_operator_key
+  local lythiumseal_operator_index lythiumseal_operator_epoch
   channel="$(metadata_field '.channel.name')"
   chain_profile="$(metadata_field '.channel.chain.profile')"
   chain_id="$(metadata_field '.channel.chain.chain_id')"
@@ -258,6 +260,10 @@ run_rebuild_check() {
   tpm_event_log_file="$(metadata_field '.provisioning_policy.tpm_binding.event_log_file_path')"
   tpm_sealed_bls_share_file="$(metadata_field '.provisioning_policy.tpm_binding.sealed_bls_share_file_path')"
   dkg_transcript_file="$(metadata_field '.provisioning_policy.tpm_binding.dkg_transcript_file_path')"
+  lythiumseal_operator_key_file="$(metadata_field '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_path')"
+  generate_lythiumseal_operator_key="$(metadata_field '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.generate_value')"
+  lythiumseal_operator_index="$(metadata_field '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.operator_index')"
+  lythiumseal_operator_epoch="$(metadata_field '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.epoch')"
 
   [[ -n "$genesis_path" && -f "$ROOT_DIR/$genesis_path" ]] \
     || fail "metadata genesis path is not present in checkout: $genesis_path"
@@ -285,6 +291,10 @@ run_rebuild_check() {
     PROTOCORE_TPM_EVENT_LOG_FILE="$tpm_event_log_file" \
     PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$tpm_sealed_bls_share_file" \
     PROTOCORE_DKG_TRANSCRIPT_FILE="$dkg_transcript_file" \
+    PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="$lythiumseal_operator_key_file" \
+    PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY="$generate_lythiumseal_operator_key" \
+    PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX="$lythiumseal_operator_index" \
+    PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH="$lythiumseal_operator_epoch" \
     MONO_CORE_DIR="$MONO_CORE_DIR" \
     make -C "$ROOT_DIR" iso metal extension sbom >/dev/null
 
@@ -317,6 +327,10 @@ run_rebuild_check() {
     PROTOCORE_TPM_EVENT_LOG_FILE="$tpm_event_log_file" \
     PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$tpm_sealed_bls_share_file" \
     PROTOCORE_DKG_TRANSCRIPT_FILE="$dkg_transcript_file" \
+    PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="$lythiumseal_operator_key_file" \
+    PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY="$generate_lythiumseal_operator_key" \
+    PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX="$lythiumseal_operator_index" \
+    PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH="$lythiumseal_operator_epoch" \
     MONO_CORE_DIR="$MONO_CORE_DIR" \
     make -C "$ROOT_DIR" metadata >/dev/null
 

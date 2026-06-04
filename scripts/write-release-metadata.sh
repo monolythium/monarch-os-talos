@@ -34,6 +34,9 @@ PROTOCORE_TPM_EVENT_LOG_FILE="${PROTOCORE_TPM_EVENT_LOG_FILE:-}"
 PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-}"
 PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-}"
 PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-}"
+PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY="${PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY:-}"
+PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX="${PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX:-}"
+PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH="${PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH:-}"
 if [[ "$PROTOCORE_REQUIRE_TPM_BINDING" == "true" ]]; then
   PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc}"
   PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE}"
@@ -230,6 +233,9 @@ jq -s \
   --arg protocore_tpm_sealed_bls_share_file "$PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" \
   --arg protocore_dkg_transcript_file "$PROTOCORE_DKG_TRANSCRIPT_FILE" \
   --arg protocore_lythiumseal_operator_key_file "$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" \
+  --arg protocore_generate_lythiumseal_operator_key "$PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY" \
+  --arg protocore_lythiumseal_operator_index "$PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX" \
+  --arg protocore_lythiumseal_operator_epoch "$PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH" \
   --argjson genesis_embedded "$(bool_json "$([[ -f "$GENESIS_TOML" ]] && printf true || printf false)")" \
   --argjson upgrade_requires_same_channel "$(bool_json "$UPGRADE_REQUIRES_SAME_CHANNEL")" \
   --arg state_migration_mode "$STATE_MIGRATION_MODE" \
@@ -357,6 +363,14 @@ jq -s \
         dkg_transcript_file_path: $protocore_dkg_transcript_file,
         lythiumseal_operator_key_file_env: "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
         lythiumseal_operator_key_file_path: $protocore_lythiumseal_operator_key_file,
+        lythiumseal_operator_key_generation: {
+          generate_env: "PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY",
+          generate_value: $protocore_generate_lythiumseal_operator_key,
+          operator_index_env: "PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX",
+          operator_index: $protocore_lythiumseal_operator_index,
+          epoch_env: "PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH",
+          epoch: $protocore_lythiumseal_operator_epoch
+        },
         required_for_operator_signing: true,
         quote_verification: {
           validator: "scripts/validate-tpm-attestation-evidence.sh",

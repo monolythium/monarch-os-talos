@@ -121,9 +121,10 @@ bundles that do not contain a real TPM quote signature.
 operator key was produced by a TPM policy-bound sealing flow. It validates
 `monarch-protocore-tpm-sealing-evidence/v1`, binds the seal record back to the
 operator enrollment and key-share ceremony when those manifests are supplied,
-hash-checks the staged quote/event-log, DKG transcript, sealed share, TPM2
-public/private/context blobs, and command log under `LOCAL_EVIDENCE_ROOT`, and
-requires the unseal validation hash to match the declared plaintext share hash.
+hash-checks the staged quote/event-log, key transcript, LythiumSeal operator
+key, TPM2 public/private/context blobs, and command log under
+`LOCAL_EVIDENCE_ROOT`, and requires the unseal validation hash to match the
+declared operator-key hash.
 
 The extension entrypoint also supports a fail-closed runtime switch for
 operator-signing nodes:
@@ -140,6 +141,21 @@ operator-signing nodes:
 When enabled, startup requires enrollment, release digest evidence, TPM quote
 evidence, a staged LythiumSeal operator key, and a key transcript. Final key
 rotation and recovery ceremonies are still tracked in the readiness docs.
+
+For images that should mint the LythiumSeal operator key on first boot instead
+of staging it in the enrollment bundle, provide the non-secret seal-seat
+metadata:
+
+```yaml
+- PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY=true
+- PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX=1
+- PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH=0
+```
+
+`PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX` is 1-based and must match the
+cluster seal-recipient slot. The generated key is sealed to the canonical
+`PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE` path and the emitted public
+encapsulation key must be captured into the cluster/genesis roster material.
 
 The QEMU release smoke path exercises the same file contract. When
 `PROTOCORE_REQUIRE_ENROLLMENT=true`, `make smoke-qemu-config` writes a

@@ -487,9 +487,12 @@ check_provisioning_policy() {
   tpm_event_log_path="$(jq -r '.provisioning_policy.tpm_binding.event_log_file_path // ""' "$metadata_path")"
   tpm_sealed_env="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_env // ""' "$metadata_path")"
   tpm_sealed_path="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_path // ""' "$metadata_path")"
-  local lythiumseal_env lythiumseal_path
+  local lythiumseal_env lythiumseal_path lythiumseal_generate lythiumseal_index lythiumseal_epoch
   lythiumseal_env="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_env // ""' "$metadata_path")"
   lythiumseal_path="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_path // ""' "$metadata_path")"
+  lythiumseal_generate="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.generate_value // ""' "$metadata_path")"
+  lythiumseal_index="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.operator_index // ""' "$metadata_path")"
+  lythiumseal_epoch="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.epoch // ""' "$metadata_path")"
   dkg_env="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_env // ""' "$metadata_path")"
   dkg_path="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_path // ""' "$metadata_path")"
   tpm_quote_validator="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.validator // ""' "$metadata_path")"
@@ -737,6 +740,18 @@ check_provisioning_policy() {
       || fail "protocore service config does not pin DKG transcript file: $dkg_path"
     grep -Fx "    - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=$lythiumseal_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin LythiumSeal operator key file: $lythiumseal_path"
+  fi
+  if [[ -n "$lythiumseal_generate" ]]; then
+    grep -Fx "    - PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY=$lythiumseal_generate" <<<"$service_config" >/dev/null \
+      || fail "protocore service config does not pin LythiumSeal keygen flag: $lythiumseal_generate"
+  fi
+  if [[ -n "$lythiumseal_index" ]]; then
+    grep -Fx "    - PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX=$lythiumseal_index" <<<"$service_config" >/dev/null \
+      || fail "protocore service config does not pin LythiumSeal operator index: $lythiumseal_index"
+  fi
+  if [[ -n "$lythiumseal_epoch" ]]; then
+    grep -Fx "    - PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH=$lythiumseal_epoch" <<<"$service_config" >/dev/null \
+      || fail "protocore service config does not pin LythiumSeal operator epoch: $lythiumseal_epoch"
   fi
 
   mapfile -t forbidden < <(jq -r '.provisioning_policy.prohibited_inline_secret_env[]?' "$metadata_path")
