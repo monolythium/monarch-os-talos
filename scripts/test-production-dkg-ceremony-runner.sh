@@ -20,9 +20,9 @@ hex_repeat() {
   printf "%${count}s" "" | tr ' ' "$byte"
 }
 
-bls_key() {
+consensus_key() {
   local byte="$1"
-  printf '%096s' "" | tr ' ' "$byte"
+  printf '%3904s' "" | tr ' ' "$byte"
 }
 
 need jq
@@ -42,9 +42,9 @@ hex_repeat() {
   printf "%${count}s" "" | tr ' ' "$byte"
 }
 
-bls_key() {
+consensus_key() {
   local byte="$1"
-  printf '%096s' "" | tr ' ' "$byte"
+  printf '%3904s' "" | tr ' ' "$byte"
 }
 
 mkdir -p "$MONARCH_DKG_EVIDENCE_ROOT/var/lib/protocore/secrets"
@@ -154,8 +154,8 @@ jq -S -n \
     ]
   }' >"$MONARCH_DKG_CEREMONY_MANIFEST"
 
-keys="0x$(bls_key 1)$(bls_key 2)$(bls_key 3)$(bls_key 4)$(bls_key 5)"
-threshold_sig="0x$(hex_repeat c 192)"
+keys="0x$(consensus_key 1)$(consensus_key 2)$(consensus_key 3)$(consensus_key 4)$(consensus_key 5)"
+threshold_sig="0x$(hex_repeat c 33090)"
 DKG_RESHARE_CREATED_AT="2026-06-01T00:00:00Z" \
   "$MONARCH_DKG_ROOT_DIR/scripts/render-dkg-reshare-attestation.sh" \
     7 "$keys" "$threshold_sig" "$MONARCH_DKG_DKG_RESHARE_ATTESTATION"

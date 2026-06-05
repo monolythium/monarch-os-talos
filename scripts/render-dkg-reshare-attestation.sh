@@ -2,10 +2,12 @@
 set -euo pipefail
 
 INTENT_ID="${DKG_RESHARE_INTENT_ID:-${1:-}}"
-BLS_PUBLIC_KEYS_HEX="${DKG_RESHARE_BLS_PUBLIC_KEYS_HEX:-${2:-}}"
+CONSENSUS_PUBLIC_KEYS_HEX="${DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX:-${DKG_RESHARE_BLS_PUBLIC_KEYS_HEX:-${2:-}}}"
 THRESHOLD_SIG_HEX="${DKG_RESHARE_THRESHOLD_SIG_HEX:-${3:-}}"
 OUTPUT="${DKG_RESHARE_ATTESTATION:-${ATTESTATION_OUTPUT:-${4:-}}}"
 CREATED_AT="${DKG_RESHARE_CREATED_AT:-}"
+CONSENSUS_PUBLIC_KEY_BYTES=1952
+THRESHOLD_SIGNATURE_BYTES=3309
 
 fail() {
   echo "dkg-reshare-attestation-render: $*" >&2
@@ -34,10 +36,10 @@ normalize_hex() {
 need jq
 
 [[ "$INTENT_ID" =~ ^[0-9]+$ ]] || fail "DKG_RESHARE_INTENT_ID must be a decimal integer"
-[[ -n "$BLS_PUBLIC_KEYS_HEX" ]] || fail "DKG_RESHARE_BLS_PUBLIC_KEYS_HEX is required"
+[[ -n "$CONSENSUS_PUBLIC_KEYS_HEX" ]] || fail "DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX is required"
 [[ -n "$THRESHOLD_SIG_HEX" ]] || fail "DKG_RESHARE_THRESHOLD_SIG_HEX is required"
 
-pubkeys="$(normalize_hex "DKG_RESHARE_BLS_PUBLIC_KEYS_HEX" "$BLS_PUBLIC_KEYS_HEX")"
+pubkeys="$(normalize_hex "DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX" "$CONSENSUS_PUBLIC_KEYS_HEX")"
 sig="$(normalize_hex "DKG_RESHARE_THRESHOLD_SIG_HEX" "$THRESHOLD_SIG_HEX")"
 
 INTENT_ID="${INTENT_ID#"${INTENT_ID%%[!0]*}"}"
@@ -50,21 +52,24 @@ fi
 
 pubkey_body="${pubkeys#0x}"
 sig_body="${sig#0x}"
-(( ${#sig_body} == 96 * 2 )) || fail "DKG_RESHARE_THRESHOLD_SIG_HEX must be 96 bytes"
-(( ${#pubkey_body} % (48 * 2) == 0 )) \
-  || fail "DKG_RESHARE_BLS_PUBLIC_KEYS_HEX must be concatenated 48-byte pubkeys"
-signer_count=$(( ${#pubkey_body} / (48 * 2) ))
+pubkey_hex_chars=$((CONSENSUS_PUBLIC_KEY_BYTES * 2))
+sig_hex_chars=$((THRESHOLD_SIGNATURE_BYTES * 2))
+(( ${#pubkey_body} % pubkey_hex_chars == 0 )) \
+  || fail "DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX must be concatenated 1952-byte public keys"
+signer_count=$(( ${#pubkey_body} / pubkey_hex_chars ))
 (( signer_count >= 5 && signer_count <= 7 )) \
-  || fail "DKG_RESHARE_BLS_PUBLIC_KEYS_HEX must contain 5..7 signer pubkeys"
+  || fail "DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX must contain 5..7 signer public keys"
+(( ${#sig_body} == signer_count * sig_hex_chars )) \
+  || fail "DKG_RESHARE_THRESHOLD_SIG_HEX must contain one 3309-byte signature per signer"
 
 tmp_keys="$(mktemp)"
 trap 'rm -f "$tmp_keys"' EXIT
-for ((offset = 0; offset < ${#pubkey_body}; offset += 96)); do
-  printf '%s\n' "${pubkey_body:$offset:96}" >>"$tmp_keys"
+for ((offset = 0; offset < ${#pubkey_body}; offset += pubkey_hex_chars)); do
+  printf '%s\n' "${pubkey_body:$offset:pubkey_hex_chars}" >>"$tmp_keys"
 done
 unique_count="$(sort -u "$tmp_keys" | wc -l | tr -d '[:space:]')"
 [[ "$unique_count" == "$signer_count" ]] \
-  || fail "DKG_RESHARE_BLS_PUBLIC_KEYS_HEX contains duplicate signer pubkeys"
+  || fail "DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX contains duplicate signer public keys"
 
 if [[ -z "$CREATED_AT" ]]; then
   CREATED_AT="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -74,14 +79,14 @@ render() {
   jq -S -n \
     --arg created_at "$CREATED_AT" \
     --arg intent_id "$INTENT_ID" \
-    --arg bls_public_keys_hex "$pubkeys" \
+    --arg consensus_public_keys_hex "$pubkeys" \
     --arg threshold_sig_hex "$sig" \
     --argjson signer_count "$signer_count" \
     '{
       schema_version: "monarch-dkg-reshare-attestation/v1",
       created_at: $created_at,
       intent_id: $intent_id,
-      bls_public_keys_hex: $bls_public_keys_hex,
+      consensus_public_keys_hex: $consensus_public_keys_hex,
       threshold_sig_hex: $threshold_sig_hex,
       signer_count: $signer_count
     }'

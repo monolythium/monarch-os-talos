@@ -16,7 +16,7 @@ need() {
 
 key() {
   local byte="$1"
-  printf '%096s' "" | tr ' ' "$byte"
+  printf '%3904s' "" | tr ' ' "$byte"
 }
 
 need jq
@@ -25,7 +25,7 @@ tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT
 
 keys="0x$(key 1)$(key 2)$(key 3)$(key 4)$(key 5)"
-sig="0x$(printf '%0192s' "" | tr ' ' c)"
+sig="0x$(printf '%33090s' "" | tr ' ' c)"
 out="$tmp_dir/dkg-reshare-attestation.json"
 
 DKG_RESHARE_CREATED_AT="2026-06-01T00:00:00Z" \
@@ -35,7 +35,7 @@ jq -e '
   .schema_version == "monarch-dkg-reshare-attestation/v1"
   and .intent_id == "7"
   and .signer_count == 5
-  and (.bls_public_keys_hex | startswith("0x"))
+  and (.consensus_public_keys_hex | startswith("0x"))
   and (.threshold_sig_hex | startswith("0x"))
 ' "$out" >/dev/null || fail "rendered attestation artifact has wrong shape"
 

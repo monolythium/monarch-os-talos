@@ -22,7 +22,7 @@ hex_repeat() {
 
 key() {
   local byte="$1"
-  printf '%096s' "" | tr ' ' "$byte"
+  printf '%3904s' "" | tr ' ' "$byte"
 }
 
 need jq
@@ -146,14 +146,14 @@ jq -S -n \
 
 out="$tmp_dir/run"
 keys="0x$(key 1)$(key 2)$(key 3)$(key 4)$(key 5)"
-threshold_sig="0x$(hex_repeat c 192)"
+threshold_sig="0x$(hex_repeat c 33090)"
 LOCAL_EVIDENCE_ROOT="$evidence_root" \
 VERIFY_LOCAL_FILES=true \
 EXPECTED_CHAIN_PROFILE=testnet \
 EXPECTED_CHAIN_ID=69420 \
 DKG_RESHARE_CREATED_AT="2026-06-01T00:00:00Z" \
 DKG_RESHARE_INTENT_ID=7 \
-DKG_RESHARE_BLS_PUBLIC_KEYS_HEX="$keys" \
+DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX="$keys" \
 DKG_RESHARE_THRESHOLD_SIG_HEX="$threshold_sig" \
   "$ROOT_DIR/scripts/run-key-share-ceremony.sh" "$ceremony" "$out" >/dev/null
 
@@ -180,7 +180,7 @@ grep -F "DKG re-share attestation is required" "$tmp_dir/missing-dkg.err" >/dev/
 
 if REQUIRE_TPM_SEALING_EVIDENCE=true \
   DKG_RESHARE_INTENT_ID=7 \
-  DKG_RESHARE_BLS_PUBLIC_KEYS_HEX="$keys" \
+  DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX="$keys" \
   DKG_RESHARE_THRESHOLD_SIG_HEX="$threshold_sig" \
   "$ROOT_DIR/scripts/run-key-share-ceremony.sh" "$ceremony" "$tmp_dir/missing-tpm" \
     >/dev/null 2>"$tmp_dir/missing-tpm.err"; then

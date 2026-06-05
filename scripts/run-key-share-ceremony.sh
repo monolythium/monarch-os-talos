@@ -18,6 +18,7 @@ ENROLLMENT_MANIFEST_FILES="${ENROLLMENT_MANIFEST_FILES:-}"
 DKG_RESHARE_ATTESTATION_INPUT="${DKG_RESHARE_ATTESTATION_INPUT:-}"
 DKG_RESHARE_ATTESTATION_OUTPUT="${DKG_RESHARE_ATTESTATION_OUTPUT:-}"
 DKG_RESHARE_INTENT_ID="${DKG_RESHARE_INTENT_ID:-}"
+DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX="${DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX:-}"
 DKG_RESHARE_BLS_PUBLIC_KEYS_HEX="${DKG_RESHARE_BLS_PUBLIC_KEYS_HEX:-}"
 DKG_RESHARE_THRESHOLD_SIG_HEX="${DKG_RESHARE_THRESHOLD_SIG_HEX:-}"
 DKG_RESHARE_CREATED_AT="${DKG_RESHARE_CREATED_AT:-}"
@@ -74,7 +75,7 @@ render_or_validate_dkg_attestation() {
   local raw_count=0
   local input="$DKG_RESHARE_ATTESTATION_INPUT"
   local intent="$DKG_RESHARE_INTENT_ID"
-  local keys="$DKG_RESHARE_BLS_PUBLIC_KEYS_HEX"
+  local keys="${DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX:-$DKG_RESHARE_BLS_PUBLIC_KEYS_HEX}"
   local sig="$DKG_RESHARE_THRESHOLD_SIG_HEX"
   local created_at="$DKG_RESHARE_CREATED_AT"
 
@@ -86,7 +87,7 @@ render_or_validate_dkg_attestation() {
     fail "provide either DKG_RESHARE_ATTESTATION_INPUT or raw DKG_RESHARE_* fields, not both"
   fi
   if [[ -z "$input" && "$raw_count" -gt 0 && "$raw_count" -lt 3 ]]; then
-    fail "DKG_RESHARE_INTENT_ID, DKG_RESHARE_BLS_PUBLIC_KEYS_HEX, and DKG_RESHARE_THRESHOLD_SIG_HEX must be supplied together"
+    fail "DKG_RESHARE_INTENT_ID, DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX, and DKG_RESHARE_THRESHOLD_SIG_HEX must be supplied together"
   fi
   if [[ -z "$input" && "$raw_count" -eq 0 ]]; then
     if bool_true "$REQUIRE_DKG_RESHARE_ATTESTATION"; then
@@ -98,7 +99,7 @@ render_or_validate_dkg_attestation() {
   if [[ -n "$input" ]]; then
     [[ -f "$input" ]] || fail "DKG_RESHARE_ATTESTATION_INPUT not found: $input"
     intent="$(jq -r '.intent_id // .intentId // ""' "$input")"
-    keys="$(jq -r '.bls_public_keys_hex // .blsPublicKeysHex // .bls_public_keys // .blsPublicKeys // ""' "$input")"
+    keys="$(jq -r '.consensus_public_keys_hex // .consensusPublicKeysHex // .bls_public_keys_hex // .blsPublicKeysHex // .bls_public_keys // .blsPublicKeys // ""' "$input")"
     sig="$(jq -r '.threshold_sig_hex // .thresholdSigHex // .threshold_signature_hex // .thresholdSignatureHex // ""' "$input")"
     created_at="$(jq -r '.created_at // .createdAt // ""' "$input")"
   fi

@@ -84,15 +84,15 @@ check_jq "Desktop DKG re-share attestation evidence is missing or malformed" \
    | ($d.schema_version == "monarch-dkg-reshare-attestation/v1")
    and (($d.created_at // "2026-01-01T00:00:00Z") | type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]+)?Z$"))
    and ($d.intent_id | uint56_string)
-   and ($d.threshold_sig_hex | even_hex and ((clean_hex | length) == 192))
-   and ($d.bls_public_keys_hex | even_hex)
-   and (($d.bls_public_keys_hex | clean_hex) as $keys
-     | (($keys | length) % 96 == 0)
-     and ([range(0; ($keys | length); 96) as $i | $keys[$i:($i + 96)]]) as $signers
+   and (($d.consensus_public_keys_hex // $d.bls_public_keys_hex) | even_hex)
+   and ((($d.consensus_public_keys_hex // $d.bls_public_keys_hex) | clean_hex) as $keys
+     | (($keys | length) % 3904 == 0)
+     and ([range(0; ($keys | length); 3904) as $i | $keys[$i:($i + 3904)]]) as $signers
      | (($signers | length) >= 5)
      and (($signers | length) <= 7)
      and (($signers | unique | length) == ($signers | length))
-     and (($d.signer_count // 0) == ($signers | length)))'
+     and (($d.signer_count // 0) == ($signers | length))
+     and ($d.threshold_sig_hex | even_hex and ((clean_hex | length) == (($signers | length) * 6618))))'
 
 check_jq "Desktop e2e OS smoke proof does not match release metadata" \
   --arg metadata "$metadata_base" \
