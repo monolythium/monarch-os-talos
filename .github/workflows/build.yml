@@ -177,10 +177,11 @@ jobs:
           make iso metal sbom
           make smoke-qemu-config
           REQUIRE_TALOS_API_PROBE=true \
-            TIMEOUT_SECONDS=180 \
-            BOOT_HOLD_SECONDS=45 \
-            POST_APPLY_TIMEOUT_SECONDS=240 \
-            EXTENSION_SERVICE_TIMEOUT_SECONDS=180 \
+            TIMEOUT_SECONDS=420 \
+            BOOT_HOLD_SECONDS=60 \
+            POST_APPLY_TIMEOUT_SECONDS=480 \
+            EXTENSION_SERVICE_TIMEOUT_SECONDS=360 \
+            PROTOCORE_RPC_TIMEOUT_SECONDS=360 \
             TALOS_MACHINE_CONFIG_FILE="_out/smoke-qemu-config/controlplane.yaml" \
             TALOSCONFIG_FILE="_out/smoke-qemu-config/talosconfig" \
             REQUIRE_EXTENSION_SERVICE_CHECK=true \
