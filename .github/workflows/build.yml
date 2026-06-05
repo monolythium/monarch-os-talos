@@ -397,6 +397,9 @@ jobs:
           name: talos-image
           path: ./_out
 
+      - name: Drop empty release sidecars
+        run: find ./_out -type f -size 0 -print -delete
+
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
