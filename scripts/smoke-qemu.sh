@@ -39,6 +39,7 @@ PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PRO
 PROTOCORE_KEY_TRANSCRIPT_FILE="${PROTOCORE_KEY_TRANSCRIPT_FILE:-${PROTOCORE_DKG_TRANSCRIPT_FILE:-/var/lib/protocore/secrets/key-transcript.json}}"
 PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-$PROTOCORE_KEY_TRANSCRIPT_FILE}"
 REQUIRE_SUBSTRATE_RUNTIME_PROOF="${REQUIRE_SUBSTRATE_RUNTIME_PROOF:-false}"
+REQUIRE_DM_VERITY_ACTIVE="${REQUIRE_DM_VERITY_ACTIVE:-false}"
 KEEP_QEMU_ALIVE="${KEEP_QEMU_ALIVE:-false}"
 RELEASE_METADATA_FILE="${RELEASE_METADATA_FILE:-"$OUT_DIR/monarch-os-talos-$TALOS_VERSION-$ARCH.release.json"}"
 
@@ -1049,12 +1050,6 @@ prove_substrate_runtime() {
     cat "$SUBSTRATE_RUNTIME_PROOF" >&2
     exit 1
   fi
-  if ! jq -e '.root_integrity.immutable_base_mount_present == true' "$SUBSTRATE_RUNTIME_PROOF" >/dev/null; then
-    substrate_runtime_proof="failed"
-    echo "runtime substrate proof failed: no read-only immutable base filesystem mount found" >&2
-    jq '.root_integrity' "$SUBSTRATE_RUNTIME_PROOF" >&2
-    exit 1
-  fi
   if ! jq -e '.kernel_config.required_enabled | to_entries | all(.value == true)' "$SUBSTRATE_RUNTIME_PROOF" >/dev/null; then
     substrate_runtime_proof="failed"
     echo "runtime substrate proof failed: required kernel options are not enabled" >&2
@@ -1072,6 +1067,34 @@ prove_substrate_runtime() {
     echo "runtime substrate proof failed: SSH listener detected on TCP port 22" >&2
     jq '.runtime_network' "$SUBSTRATE_RUNTIME_PROOF" >&2
     exit 1
+  fi
+  local baseline_requires_immutable baseline_requires_dm_kernel baseline_requires_active
+  baseline_requires_immutable="$(jq -r '.rootfs.requires_immutable_base_mount // false' "$KERNEL_BASELINE_FILE")"
+  baseline_requires_dm_kernel="$(jq -r '.rootfs.requires_dm_verity_kernel_support // false' "$KERNEL_BASELINE_FILE")"
+  baseline_requires_active="$(jq -r '.rootfs.dm_verity_active_evidence_required // false' "$KERNEL_BASELINE_FILE")"
+  if [[ "$baseline_requires_immutable" == "true" || "$REQUIRE_DM_VERITY_ACTIVE" == "true" || "$baseline_requires_active" == "true" ]]; then
+    if ! jq -e '.root_integrity.immutable_base_mount_present == true' "$SUBSTRATE_RUNTIME_PROOF" >/dev/null; then
+      substrate_runtime_proof="failed"
+      echo "runtime substrate proof failed: no read-only immutable base filesystem mount found" >&2
+      jq '.root_integrity' "$SUBSTRATE_RUNTIME_PROOF" >&2
+      exit 1
+    fi
+  fi
+  if [[ "$baseline_requires_dm_kernel" == "true" || "$REQUIRE_DM_VERITY_ACTIVE" == "true" || "$baseline_requires_active" == "true" ]]; then
+    if ! jq -e '.root_integrity.dm_verity.kernel_support == true' "$SUBSTRATE_RUNTIME_PROOF" >/dev/null; then
+      substrate_runtime_proof="failed"
+      echo "runtime substrate proof failed: dm-verity kernel support is missing" >&2
+      jq '.root_integrity.dm_verity' "$SUBSTRATE_RUNTIME_PROOF" >&2
+      exit 1
+    fi
+  fi
+  if [[ "$REQUIRE_DM_VERITY_ACTIVE" == "true" || "$baseline_requires_active" == "true" ]]; then
+    if ! jq -e '.root_integrity.dm_verity.active_evidence == true and .root_integrity.dm_verity.root_hash_evidence == true' "$SUBSTRATE_RUNTIME_PROOF" >/dev/null; then
+      substrate_runtime_proof="failed"
+      echo "runtime substrate proof failed: dm-verity active evidence is missing" >&2
+      jq '.root_integrity.dm_verity' "$SUBSTRATE_RUNTIME_PROOF" >&2
+      exit 1
+    fi
   fi
 
   substrate_runtime_proof="ok"

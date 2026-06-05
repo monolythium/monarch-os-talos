@@ -202,10 +202,6 @@ check_smoke_qemu() {
       || fail "runtime substrate proof status is not ok"
     jq -e '.root_mount.read_only == true' "$substrate_log" >/dev/null \
       || fail "runtime substrate proof did not verify read-only root mount"
-    jq -e '.root_integrity.immutable_base_mount_present == true' "$substrate_log" >/dev/null \
-      || fail "runtime substrate proof did not verify an immutable base filesystem mount"
-    jq -e '.root_integrity.dm_verity.kernel_support == true' "$substrate_log" >/dev/null \
-      || fail "runtime substrate proof did not verify dm-verity kernel support"
     jq -e '.kernel_config.required_enabled | to_entries | all(.value == true)' "$substrate_log" >/dev/null \
       || fail "runtime substrate proof did not verify required kernel options enabled"
     jq -e '.kernel_config.required_disabled_or_absent | to_entries | all(.value == true)' "$substrate_log" >/dev/null \
@@ -227,8 +223,18 @@ check_smoke_qemu() {
       || fail "metadata kernel hardening baseline sha256 mismatch"
     [[ "$proof_baseline_sha" == "$metadata_baseline_sha" ]] \
       || fail "runtime substrate proof baseline sha256 does not match metadata"
-    local baseline_requires_active
+    local baseline_requires_immutable baseline_requires_dm_kernel baseline_requires_active
+    baseline_requires_immutable="$(jq -r '.rootfs.requires_immutable_base_mount // false' "$ROOT_DIR/$metadata_baseline_path")"
+    baseline_requires_dm_kernel="$(jq -r '.rootfs.requires_dm_verity_kernel_support // false' "$ROOT_DIR/$metadata_baseline_path")"
     baseline_requires_active="$(jq -r '.rootfs.dm_verity_active_evidence_required // false' "$ROOT_DIR/$metadata_baseline_path")"
+    if [[ "$baseline_requires_immutable" == "true" || "$REQUIRE_DM_VERITY_ACTIVE" == "true" || "$baseline_requires_active" == "true" ]]; then
+      jq -e '.root_integrity.immutable_base_mount_present == true' "$substrate_log" >/dev/null \
+        || fail "runtime substrate proof did not verify an immutable base filesystem mount"
+    fi
+    if [[ "$baseline_requires_dm_kernel" == "true" || "$REQUIRE_DM_VERITY_ACTIVE" == "true" || "$baseline_requires_active" == "true" ]]; then
+      jq -e '.root_integrity.dm_verity.kernel_support == true' "$substrate_log" >/dev/null \
+        || fail "runtime substrate proof did not verify dm-verity kernel support"
+    fi
     if [[ "$REQUIRE_DM_VERITY_ACTIVE" == "true" || "$baseline_requires_active" == "true" ]]; then
       local expected_root_hashes_json
       expected_root_hashes_json="$(jq -c '

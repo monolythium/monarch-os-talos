@@ -432,6 +432,7 @@ static int verify_provisioning_policy(int operator_enabled, int first_boot, cons
         "PROTOCORE_ENROLLMENT_FILE",
         "PROTOCORE_KEYSTORE_PASSPHRASE_FILE",
         "PROTOCORE_NODE_MODE",
+        "PROTOCORE_START_NODE_MODE",
         "PROTOCORE_NO_OPERATOR",
         "PROTOCORE_CHAIN_ID",
         "PROTOCORE_P2P_LISTEN",
@@ -709,6 +710,30 @@ static void append_optional(char **argv, size_t *idx, const char *flag, const ch
         argv[(*idx)++] = (char *)flag;
         argv[(*idx)++] = (char *)value;
     }
+}
+
+static int append_start_node_mode(char **argv, size_t *idx) {
+    const char *value = getenv("PROTOCORE_START_NODE_MODE");
+    const char *cli_value = NULL;
+
+    if (!value || !value[0]) {
+        return 0;
+    }
+    if (strcmp(value, "operator") == 0) {
+        cli_value = "validator";
+    } else if (strcmp(value, "full") == 0 || strcmp(value, "full-node") == 0 ||
+               strcmp(value, "observer") == 0) {
+        cli_value = "full";
+    } else {
+        fprintf(stderr,
+                "PROTOCORE_START_NODE_MODE must be operator or full, got %s\n",
+                value);
+        return -1;
+    }
+
+    argv[(*idx)++] = "--node-mode";
+    argv[(*idx)++] = (char *)cli_value;
+    return 0;
 }
 
 static int operator_consensus_key_exists(const char *home) {
@@ -994,6 +1019,9 @@ int main(void) {
     start_argv[idx++] = "json";
     start_argv[idx++] = "start";
 
+    if (append_start_node_mode(start_argv, &idx) != 0) {
+        return 1;
+    }
     append_optional(start_argv, &idx, "--p2p-listen", "PROTOCORE_P2P_LISTEN");
     append_optional(start_argv, &idx, "--discovery", "PROTOCORE_DISCOVERY");
     append_optional(start_argv, &idx, "--zkml-vkey-hash", "PROTOCORE_ZKML_VKEY_HASH");

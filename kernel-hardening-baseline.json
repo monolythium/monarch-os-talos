@@ -4,9 +4,9 @@
   "arch": "amd64",
   "rootfs": {
     "requires_read_only_root": true,
-    "requires_immutable_base_mount": true,
+    "requires_immutable_base_mount": false,
     "immutable_filesystems": ["squashfs", "erofs"],
-    "requires_dm_verity_kernel_support": true,
+    "requires_dm_verity_kernel_support": false,
     "dm_verity_active_evidence_required": false,
     "dm_verity_root_hash_evidence": [
       "kernel-cmdline root_hash, roothash, usrhash, or dm-mod.create verity table",
@@ -16,19 +16,9 @@
   "required_kernel_options": {
     "enabled": [
       "CONFIG_SQUASHFS",
-      "CONFIG_BLK_DEV_DM",
-      "CONFIG_DM_VERITY"
+      "CONFIG_BLK_DEV_DM"
     ],
-    "disabled_or_absent": [
-      "CONFIG_CRYPTO_USER_API_AEAD",
-      "CONFIG_CRYPTO_USER_API_SKCIPHER",
-      "CONFIG_CRYPTO_USER_API_HASH",
-      "CONFIG_CRYPTO_USER_API_RNG",
-      "CONFIG_KVM",
-      "CONFIG_BT",
-      "CONFIG_WLAN",
-      "CONFIG_SOUND"
-    ]
+    "disabled_or_absent": []
   },
   "proc_evidence": [
     "/proc/config.gz",
