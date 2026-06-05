@@ -10,7 +10,7 @@
 
 This repository is published primarily for **auditability**. The OS recipe, the `monarch-protocore` Talos system extension entrypoint, build scripts, and the signed-release workflow shape are all here in source form. What is **not yet wired**:
 
-- **Signed ISO/raw release automation is live, and preview artifacts are published.** The GitHub Actions workflow downloads a signed `protocore` release asset, builds ISO/raw/extension artifacts with the local Makefile, emits SPDX SBOMs, and signs outputs with cosign keyless. Published `*-preview` releases carry cosign-signed ISOs (see [Trust model + verification](#trust-model--verification)). These previews still bake an **older `protocore` testnet binary and an earlier testnet genesis** — they are for auditability and boot testing, not production operation.
+- **Signed ISO/raw release automation is live, and preview artifacts are published.** The GitHub Actions workflow downloads a signed `protocore` release asset, builds ISO/raw/extension artifacts with the local Makefile, emits SPDX SBOMs, and signs outputs with cosign keyless. Published `*-preview` releases carry cosign-signed ISOs (see [Trust model + verification](#trust-model--verification)). Preview releases are for auditability and boot testing, not production operation.
 - **External `make build` needs either a prebuilt `protocore` binary or a sibling core checkout.** The easiest public path is `PROTOCORE_BINARY=/path/to/protocore make build`.
 - **No `monarch-cli` extension is shipped in v1.** The node service is operated through Talos API and Monarch Desktop; any future on-node CLI package must be introduced as a real released extension, not a reserved placeholder.
 - **First-boot operator enrollment, secret injection, firewall enforcement, upgrade/rollback automation, SLSA-level provenance, release-channel promotion, configured QEMU/Desktop e2e, and final Desktop lifecycle hardening are all listed as missing or partial** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md). The image now creates its own sealed operator consensus identity on first boot; admission and cluster membership are separate chain/desktop flows.
@@ -392,11 +392,10 @@ ship a cosign-signed ISO. Each release artifact carries:
   digest, healthy Talos/Protocore readiness, successful Talos restart receipt,
   and verified two-operator chat exchange.
 
-> **Preview, not production.** The current preview ISOs bake an older `protocore`
-> testnet binary and an earlier testnet genesis (see the `sources.protocore_binary`
-> field in the `*.release.json`). They are published for auditability and boot
-> testing. A non-preview ISO rebuilt on the live testnet binary + genesis is the
-> next milestone — treat preview output accordingly.
+> **Preview, not production.** Preview ISOs are published for auditability and
+> boot testing. Check the `sources.protocore_binary` and genesis fields in the
+> `*.release.json` before using a build against a live testnet. A non-preview ISO
+> with full promotion evidence is still the production milestone.
 
 ### cosign certificate identity
 
