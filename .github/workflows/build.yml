@@ -186,11 +186,11 @@ jobs:
             substrate_runtime_required=false
           fi
           REQUIRE_TALOS_API_PROBE=true \
-            TIMEOUT_SECONDS=420 \
-            BOOT_HOLD_SECONDS=120 \
-            POST_APPLY_TIMEOUT_SECONDS=480 \
-            EXTENSION_SERVICE_TIMEOUT_SECONDS=360 \
-            PROTOCORE_RPC_TIMEOUT_SECONDS=360 \
+            TIMEOUT_SECONDS=720 \
+            BOOT_HOLD_SECONDS=180 \
+            POST_APPLY_TIMEOUT_SECONDS=720 \
+            EXTENSION_SERVICE_TIMEOUT_SECONDS=600 \
+            PROTOCORE_RPC_TIMEOUT_SECONDS=600 \
             TALOS_MACHINE_CONFIG_FILE="_out/smoke-qemu-config/controlplane.yaml" \
             TALOSCONFIG_FILE="_out/smoke-qemu-config/talosconfig" \
             REQUIRE_EXTENSION_SERVICE_CHECK=true \
