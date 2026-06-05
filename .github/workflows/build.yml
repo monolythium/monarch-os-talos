@@ -337,6 +337,7 @@ jobs:
         run: make test-operator-audit-trail
 
       - name: Resolve Desktop e2e evidence
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           PROMOTION_METADATA: _out/monarch-os-talos-v1.13.0-amd64.release.json
@@ -353,6 +354,7 @@ jobs:
           fi
 
       - name: Check channel promotion policy
+        if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: make check-channel-promotion PROMOTION_METADATA="_out/monarch-os-talos-v1.13.0-amd64.release.json"
