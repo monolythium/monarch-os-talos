@@ -408,6 +408,10 @@ probe_protocore_rpc() {
   protocore_rpc_probe="failed"
   echo "Protocore RPC probe failed on 127.0.0.1:${PROTOCORE_RPC_HOST_PORT}" >&2
   cat "$RPC_LOG.tmp" >&2 2>/dev/null || true
+  if [[ -s "$SERVICE_LOGS" ]]; then
+    echo "recent ${EXTENSION_SERVICE_NAME} logs:" >&2
+    tail -120 "$SERVICE_LOGS" >&2 || true
+  fi
   exit 1
 }
 

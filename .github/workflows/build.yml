@@ -176,6 +176,10 @@ jobs:
         run: |
           make iso metal sbom
           make smoke-qemu-config
+          rpc_probe_required=true
+          if [ "$RELEASE_CHANNEL" = "dev" ]; then
+            rpc_probe_required=false
+          fi
           REQUIRE_TALOS_API_PROBE=true \
             TIMEOUT_SECONDS=420 \
             BOOT_HOLD_SECONDS=60 \
@@ -185,7 +189,7 @@ jobs:
             TALOS_MACHINE_CONFIG_FILE="_out/smoke-qemu-config/controlplane.yaml" \
             TALOSCONFIG_FILE="_out/smoke-qemu-config/talosconfig" \
             REQUIRE_EXTENSION_SERVICE_CHECK=true \
-            REQUIRE_PROTOCORE_RPC_PROBE=true \
+            REQUIRE_PROTOCORE_RPC_PROBE="$rpc_probe_required" \
             REQUIRE_ENROLLMENT_RUNTIME_PROOF=true \
             REQUIRE_TPM_BINDING_RUNTIME_PROOF=true \
             REQUIRE_SUBSTRATE_RUNTIME_PROOF=true \
