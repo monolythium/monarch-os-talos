@@ -171,8 +171,11 @@ jobs:
           PROTOCORE_REQUIRE_TPM_BINDING: "true"
           PROTOCORE_TPM_QUOTE_FILE: "/var/lib/protocore/attestation/quote.bin"
           PROTOCORE_TPM_EVENT_LOG_FILE: "/var/lib/protocore/attestation/eventlog.bin"
-          PROTOCORE_TPM_SEALED_BLS_SHARE_FILE: "/var/lib/protocore/secrets/bls-share.sealed"
-          PROTOCORE_DKG_TRANSCRIPT_FILE: "/var/lib/protocore/secrets/dkg-transcript.json"
+          PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
+          PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
+          PROTOCORE_TPM_SEALED_BLS_SHARE_FILE: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
+          PROTOCORE_KEY_TRANSCRIPT_FILE: "/var/lib/protocore/secrets/key-transcript.json"
+          PROTOCORE_DKG_TRANSCRIPT_FILE: "/var/lib/protocore/secrets/key-transcript.json"
         run: |
           make iso metal sbom
           make smoke-qemu-config
