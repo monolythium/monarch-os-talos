@@ -187,7 +187,7 @@ jobs:
           fi
           REQUIRE_TALOS_API_PROBE=true \
             TIMEOUT_SECONDS=420 \
-            BOOT_HOLD_SECONDS=60 \
+            BOOT_HOLD_SECONDS=120 \
             POST_APPLY_TIMEOUT_SECONDS=480 \
             EXTENSION_SERVICE_TIMEOUT_SECONDS=360 \
             PROTOCORE_RPC_TIMEOUT_SECONDS=360 \
