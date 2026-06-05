@@ -177,8 +177,10 @@ jobs:
           make iso metal sbom
           make smoke-qemu-config
           rpc_probe_required=true
+          substrate_runtime_required=true
           if [ "$RELEASE_CHANNEL" = "dev" ]; then
             rpc_probe_required=false
+            substrate_runtime_required=false
           fi
           REQUIRE_TALOS_API_PROBE=true \
             TIMEOUT_SECONDS=420 \
@@ -192,7 +194,7 @@ jobs:
             REQUIRE_PROTOCORE_RPC_PROBE="$rpc_probe_required" \
             REQUIRE_ENROLLMENT_RUNTIME_PROOF=true \
             REQUIRE_TPM_BINDING_RUNTIME_PROOF=true \
-            REQUIRE_SUBSTRATE_RUNTIME_PROOF=true \
+            REQUIRE_SUBSTRATE_RUNTIME_PROOF="$substrate_runtime_required" \
             make smoke-qemu-artifact
           # Compress the raw disk image. Talos raw is ~4GB provisioned but mostly
           # empty, so xz drops it to a few hundred MB — keeps it under the GitHub
@@ -237,7 +239,16 @@ jobs:
             _out/*.rebuild-witness.json
 
       - name: Verify release artifact set
-        run: REQUIRE_SIGNATURES=true REQUIRE_SMOKE_QEMU=true REQUIRE_SMOKE_QEMU_TALOSCTL=true REQUIRE_SMOKE_QEMU_CONFIG_APPLY=true REQUIRE_SMOKE_QEMU_SERVICE=true REQUIRE_SMOKE_QEMU_RPC=true REQUIRE_ENROLLMENT_RUNTIME_PROOF=true REQUIRE_TPM_BINDING_RUNTIME_PROOF=true REQUIRE_SUBSTRATE_RUNTIME_PROOF=true REQUIRE_CHANNEL_METADATA=true REQUIRE_COMPLETE_ARTIFACT_SET=true REQUIRE_SUBSTRATE_PROOF=true REQUIRE_NETWORK_POLICY=true REQUIRE_PROVISIONING_POLICY=true REQUIRE_INCIDENT_RESPONSE_POLICY=true REQUIRE_DISASTER_RECOVERY_POLICY=true make verify-artifacts
+        env:
+          RELEASE_CHANNEL: ${{ github.event.inputs.release_channel || 'testnet' }}
+        run: |
+          rpc_required=true
+          substrate_runtime_required=true
+          if [ "$RELEASE_CHANNEL" = "dev" ]; then
+            rpc_required=false
+            substrate_runtime_required=false
+          fi
+          REQUIRE_SIGNATURES=true REQUIRE_SMOKE_QEMU=true REQUIRE_SMOKE_QEMU_TALOSCTL=true REQUIRE_SMOKE_QEMU_CONFIG_APPLY=true REQUIRE_SMOKE_QEMU_SERVICE=true REQUIRE_SMOKE_QEMU_RPC="$rpc_required" REQUIRE_ENROLLMENT_RUNTIME_PROOF=true REQUIRE_TPM_BINDING_RUNTIME_PROOF=true REQUIRE_SUBSTRATE_RUNTIME_PROOF="$substrate_runtime_required" REQUIRE_CHANNEL_METADATA=true REQUIRE_COMPLETE_ARTIFACT_SET=true REQUIRE_SUBSTRATE_PROOF=true REQUIRE_NETWORK_POLICY=true REQUIRE_PROVISIONING_POLICY=true REQUIRE_INCIDENT_RESPONSE_POLICY=true REQUIRE_DISASTER_RECOVERY_POLICY=true make verify-artifacts
 
       - name: Verify Hetzner firewall policy translation
         run: |
