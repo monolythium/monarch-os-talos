@@ -202,7 +202,8 @@ jobs:
           # (Hetzner Cloud snapshot flow) and other cloud import tools.
           shopt -s nullglob
           for raw in _out/*.raw; do
-            xz -T0 -9 -f "$raw"
+            xz -T0 -9 -c "$raw" > "$raw.xz"
+            rm -f "$raw"
           done
           for xz in _out/*.raw.xz; do
             (cd "$(dirname "$xz")" && sha256sum "$(basename "$xz")" > "$(basename "$xz").sha256")

@@ -300,7 +300,8 @@ run_rebuild_check() {
 
   shopt -s nullglob
   for raw in "$REBUILD_OUT_DIR"/*.raw; do
-    xz -T0 -9 -f "$raw"
+    xz -T0 -9 -c "$raw" > "$raw.xz"
+    rm -f "$raw"
     (cd "$(dirname "$raw")" && sha256sum "$(basename "$raw").xz" > "$(basename "$raw").xz.sha256")
   done
 
