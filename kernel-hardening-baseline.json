@@ -18,7 +18,25 @@
       "CONFIG_SQUASHFS",
       "CONFIG_BLK_DEV_DM"
     ],
-    "disabled_or_absent": []
+    "disabled_or_absent_rationale": "Whitepaper v5.0 section 21.2 kernel attack-surface trim. The operator node performs all cryptography in-process via Rust libraries (ML-DSA-65, ML-KEM, BLAKE3, SLH-DSA) and never via the userspace kernel crypto API, so the AF_ALG/algif crypto-socket family is compiled out. Operators do not host VMs, use Bluetooth, or use wireless drivers (wired network only), and do not mount legacy filesystems, so those subsystems are compiled out or out of autoload to shrink future-CVE exposure. Each token must be absent or =n in /proc/config.gz.",
+    "disabled_or_absent": [
+      "CONFIG_CRYPTO_USER_API",
+      "CONFIG_CRYPTO_USER_API_HASH",
+      "CONFIG_CRYPTO_USER_API_SKCIPHER",
+      "CONFIG_CRYPTO_USER_API_RNG",
+      "CONFIG_CRYPTO_USER_API_AEAD",
+      "CONFIG_VIRTUALIZATION",
+      "CONFIG_KVM",
+      "CONFIG_BT",
+      "CONFIG_CFG80211",
+      "CONFIG_WLAN",
+      "CONFIG_MAC80211",
+      "CONFIG_HFS_FS",
+      "CONFIG_HFSPLUS_FS",
+      "CONFIG_JFS_FS",
+      "CONFIG_REISERFS_FS",
+      "CONFIG_MINIX_FS"
+    ]
   },
   "proc_evidence": [
     "/proc/config.gz",
