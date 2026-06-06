@@ -59,11 +59,14 @@ validate_hash32() {
     || fail "$label must be a 32-byte hex digest"
 }
 
-validate_bls_pubkey() {
+validate_consensus_pubkey() {
   local label="$1"
   local value="$2"
-  [[ "$value" =~ ^(0x)?[0-9a-fA-F]{96}$ ]] \
-    || fail "$label must be a 48-byte BLS12-381 public key"
+  # ML-DSA-65 public key, 1952 bytes = 3904 hex chars. There is no threshold
+  # group key under the post-quantum per-operator multisig; this field records
+  # the cluster's ML-DSA-65 consensus public key.
+  [[ "$value" =~ ^(0x)?[0-9a-fA-F]{3904}$ ]] \
+    || fail "$label must be a 1952-byte ML-DSA-65 public key"
 }
 
 validate_file_ref() {
@@ -233,14 +236,14 @@ dkg_commitment_hash="$(field '.dkg.transcript_commitment_hash')"
 dkg_participant_hash="$(field '.dkg.participant_commitments_hash')"
 dkg_share_bundle_hash="$(field '.dkg.encrypted_share_bundle_hash')"
 dkg_group_public_key="$(field '.dkg.group_public_key_hex')"
-[[ "$dkg_scheme" == "Ferveo-BLS12-381" ]] || fail "dkg.threshold_scheme must be Ferveo-BLS12-381"
+[[ "$dkg_scheme" == "ML-DSA-65-bitmap-multisig" ]] || fail "dkg.threshold_scheme must be ML-DSA-65-bitmap-multisig"
 validate_file_ref "dkg.transcript_source_file" "$dkg_source_file"
 validate_file_ref "dkg.transcript_import_file" "$dkg_import_file"
 validate_hash32 "dkg.transcript_sha256" "$dkg_sha"
 validate_hash32 "dkg.transcript_commitment_hash" "$dkg_commitment_hash"
 validate_hash32 "dkg.participant_commitments_hash" "$dkg_participant_hash"
 validate_hash32 "dkg.encrypted_share_bundle_hash" "$dkg_share_bundle_hash"
-validate_bls_pubkey "dkg.group_public_key_hex" "$dkg_group_public_key"
+validate_consensus_pubkey "dkg.group_public_key_hex" "$dkg_group_public_key"
 [[ "$dkg_source_file" == "$(ceremony_field '.dkg.next_transcript_file')" ]] \
   || fail "dkg.transcript_source_file must match ceremony dkg.next_transcript_file"
 hash32_equals "dkg.transcript_sha256" "$(ceremony_field '.dkg.next_transcript_hash')" "$dkg_sha"

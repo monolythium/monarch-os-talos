@@ -31,12 +31,12 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 evidence_root="$tmp_dir/evidence"
 mkdir -p "$evidence_root/var/lib/protocore/secrets"
-printf 'sealed share import for operator 2\n' >"$evidence_root/var/lib/protocore/secrets/bls-share.sealed"
+printf 'sealed share import for operator 2\n' >"$evidence_root/var/lib/protocore/secrets/consensus-share.sealed"
 printf 'dkg transcript import\n' >"$evidence_root/var/lib/protocore/secrets/dkg-transcript.json"
 cp "$evidence_root/var/lib/protocore/secrets/dkg-transcript.json" \
   "$evidence_root/var/lib/protocore/secrets/dkg-transcript-next.json"
 for i in $(seq 0 9); do
-  cp "$evidence_root/var/lib/protocore/secrets/bls-share.sealed" \
+  cp "$evidence_root/var/lib/protocore/secrets/consensus-share.sealed" \
     "$evidence_root/var/lib/protocore/secrets/share-$i.sealed"
 done
 
@@ -47,9 +47,9 @@ h3="$(printf '3%.0s' {1..64})"
 h6="$(printf '6%.0s' {1..64})"
 h7="$(printf '7%.0s' {1..64})"
 h9="$(printf '9%.0s' {1..64})"
-share_hash="$(sha256sum "$evidence_root/var/lib/protocore/secrets/bls-share.sealed" | awk '{print $1}')"
+share_hash="$(sha256sum "$evidence_root/var/lib/protocore/secrets/consensus-share.sealed" | awk '{print $1}')"
 transcript_hash="$(sha256sum "$evidence_root/var/lib/protocore/secrets/dkg-transcript.json" | awk '{print $1}')"
-bls_pubkey="$(printf 'b%.0s' {1..96})"
+consensus_pubkey="$(printf 'b%.0s' {1..3904})"
 signature="$(printf 'a%.0s' {1..128})"
 
 valid_key_share="$tmp_dir/key-share-valid.json"
@@ -68,7 +68,7 @@ jq -n \
   --arg h7 "$h7" \
   --arg share_hash "$share_hash" \
   --arg transcript_hash "$transcript_hash" \
-  --arg bls_pubkey "$bls_pubkey" \
+  --arg consensus_pubkey "$consensus_pubkey" \
   --arg signature "$signature" \
   '
     def addr($i): "0x" + (($i + 1 | tostring) * 40)[0:40];
@@ -107,14 +107,14 @@ jq -n \
         }
       ],
       dkg: {
-        threshold_scheme: "Ferveo-BLS12-381",
+        threshold_scheme: "ML-DSA-65-bitmap-multisig",
         previous_transcript_hash: $h0,
         next_transcript_file: "/var/lib/protocore/secrets/dkg-transcript-next.json",
         next_transcript_hash: $transcript_hash,
         transcript_commitment_hash: $h6,
         participant_commitments_hash: $h7,
         encrypted_share_bundle_hash: $share_hash,
-        group_public_key_hex: $bls_pubkey
+        group_public_key_hex: $consensus_pubkey
       },
       release: {
         metadata_sha256: $h0,
@@ -171,14 +171,14 @@ expect_fail bad-operator-binding \
   env EXPECTED_CHAIN_PROFILE=testnet EXPECTED_CHAIN_ID=69420 \
   "$ROOT_DIR/scripts/validate-key-share-handoff.sh" "$bad_operator" "$valid_key_share"
 
-jq '.sealed_share.import_file = "/tmp/bls-share.sealed"' \
+jq '.sealed_share.import_file = "/tmp/consensus-share.sealed"' \
   "$valid_handoff" >"$bad_import_path"
 expect_fail bad-import-path \
   env EXPECTED_CHAIN_PROFILE=testnet EXPECTED_CHAIN_ID=69420 \
   "$ROOT_DIR/scripts/validate-key-share-handoff.sh" "$bad_import_path" "$valid_key_share"
 
 cp -R "$evidence_root" "$bad_evidence_root"
-printf 'not the sealed share\n' >"$bad_evidence_root/var/lib/protocore/secrets/bls-share.sealed"
+printf 'not the sealed share\n' >"$bad_evidence_root/var/lib/protocore/secrets/consensus-share.sealed"
 expect_fail bad-local-file-hash \
   env EXPECTED_CHAIN_PROFILE=testnet EXPECTED_CHAIN_ID=69420 LOCAL_EVIDENCE_ROOT="$bad_evidence_root" VERIFY_LOCAL_FILES=true \
   "$ROOT_DIR/scripts/validate-key-share-handoff.sh" "$valid_handoff" "$valid_key_share"

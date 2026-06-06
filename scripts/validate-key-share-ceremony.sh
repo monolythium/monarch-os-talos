@@ -155,11 +155,14 @@ canonical_lifecycle_payload_hash() {
   ' "$MANIFEST" | sha256sum | awk '{print $1}'
 }
 
-validate_bls_pubkey() {
+validate_consensus_pubkey() {
   local label="$1"
   local value="$2"
-  [[ "$value" =~ ^(0x)?[0-9a-fA-F]{96}$ ]] \
-    || fail "$label must be a 48-byte BLS12-381 public key"
+  # ML-DSA-65 public key, 1952 bytes = 3904 hex chars. There is no threshold
+  # group key under the post-quantum per-operator multisig; this field records
+  # the cluster's ML-DSA-65 consensus public key.
+  [[ "$value" =~ ^(0x)?[0-9a-fA-F]{3904}$ ]] \
+    || fail "$label must be a 1952-byte ML-DSA-65 public key"
 }
 
 validate_file_ref() {
@@ -278,13 +281,13 @@ fi
 (( next_epoch > previous_epoch )) \
   || fail "cluster.next_dkg_epoch must be greater than previous_dkg_epoch"
 
-[[ "$threshold_scheme" == "Ferveo-BLS12-381" ]] \
-  || fail "dkg.threshold_scheme must be Ferveo-BLS12-381"
+[[ "$threshold_scheme" == "ML-DSA-65-bitmap-multisig" ]] \
+  || fail "dkg.threshold_scheme must be ML-DSA-65-bitmap-multisig"
 validate_hash32 "dkg.next_transcript_hash" "$next_transcript_hash"
 validate_hash32 "dkg.transcript_commitment_hash" "$transcript_commitment_hash"
 validate_hash32 "dkg.participant_commitments_hash" "$participant_commitments_hash"
 validate_hash32 "dkg.encrypted_share_bundle_hash" "$encrypted_share_bundle_hash"
-validate_bls_pubkey "dkg.group_public_key_hex" "$group_public_key_hex"
+validate_consensus_pubkey "dkg.group_public_key_hex" "$group_public_key_hex"
 validate_file_ref "dkg.next_transcript_file" "$next_transcript_file" "/var/lib/protocore/secrets/"
 if [[ "$ceremony_type" != "initial-dkg" ]]; then
   validate_hash32 "dkg.previous_transcript_hash" "$previous_transcript_hash"

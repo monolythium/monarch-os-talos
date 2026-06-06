@@ -104,14 +104,14 @@ jq -S -n \
         }
     ],
     dkg: {
-      threshold_scheme: "Ferveo-BLS12-381",
+      threshold_scheme: "ML-DSA-65-bitmap-multisig",
       previous_transcript_hash: $h4,
       next_transcript_file: "/var/lib/protocore/secrets/dkg-transcript-next.json",
       next_transcript_hash: $transcript_hash,
       transcript_commitment_hash: $h5,
       participant_commitments_hash: $h6,
       encrypted_share_bundle_hash: $h7,
-      group_public_key_hex: ("0x" + ("b" * 96))
+      group_public_key_hex: ("0x" + ("b" * 3904))
     },
     release: {
       metadata_sha256: $h8,

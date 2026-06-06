@@ -121,7 +121,7 @@ h5="$(printf '5%.0s' {1..64})"
 h6="$(printf '6%.0s' {1..64})"
 h7="$(printf '7%.0s' {1..64})"
 h9="$(printf '9%.0s' {1..64})"
-bls_pubkey="$(printf 'b%.0s' {1..96})"
+consensus_pubkey="$(printf 'b%.0s' {1..3904})"
 signature="$(printf 'a%.0s' {1..128})"
 
 quote_hash="$(sha256sum "$evidence_root/var/lib/protocore/attestation/quote.bin" | awk '{print $1}')"
@@ -157,7 +157,7 @@ jq -n \
   --arg public_blob_hash "$public_blob_hash" \
   --arg private_blob_hash "$private_blob_hash" \
   --arg context_hash "$context_hash" \
-  --arg bls_pubkey "$bls_pubkey" \
+  --arg consensus_pubkey "$consensus_pubkey" \
   --arg signature "$signature" \
   '{
     schema_version: "monarch-protocore-tpm-sealing-evidence/v1",
@@ -200,7 +200,7 @@ jq -n \
       transcript_file: "/var/lib/protocore/secrets/dkg-transcript-next.json",
       transcript_sha256: $dkg_hash,
       encrypted_share_bundle_hash: $h6,
-      group_public_key_hex: $bls_pubkey
+      group_public_key_hex: $consensus_pubkey
     },
     sealed_share: {
       file: "/var/lib/protocore/secrets/share-2.sealed",
@@ -251,7 +251,7 @@ jq -n \
   --arg event_log_hash "$event_log_hash" \
   --arg dkg_hash "$dkg_hash" \
   --arg sealed_share_hash "$sealed_share_hash" \
-  --arg bls_pubkey "$bls_pubkey" \
+  --arg consensus_pubkey "$consensus_pubkey" \
   --arg signature "$signature" \
   'def addr($i): [
       "0x1111111111111111111111111111111111111111",
@@ -300,14 +300,14 @@ jq -n \
         }
       ],
       dkg: {
-        threshold_scheme: "Ferveo-BLS12-381",
+        threshold_scheme: "ML-DSA-65-bitmap-multisig",
         previous_transcript_hash: $h0,
         next_transcript_file: "/var/lib/protocore/secrets/dkg-transcript-next.json",
         next_transcript_hash: $dkg_hash,
         transcript_commitment_hash: $h7,
         participant_commitments_hash: $h0,
         encrypted_share_bundle_hash: $h6,
-        group_public_key_hex: $bls_pubkey
+        group_public_key_hex: $consensus_pubkey
       },
       release: {
         metadata_sha256: $h0,

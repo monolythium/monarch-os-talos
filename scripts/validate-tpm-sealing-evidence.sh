@@ -43,11 +43,14 @@ validate_hash32() {
     || fail "$label must be a 32-byte hex digest"
 }
 
-validate_bls_pubkey() {
+validate_consensus_pubkey() {
   local label="$1"
   local value="$2"
-  [[ "$value" =~ ^(0x)?[0-9a-fA-F]{96}$ ]] \
-    || fail "$label must be a 48-byte BLS12-381 public key"
+  # ML-DSA-65 public key, 1952 bytes = 3904 hex chars. There is no threshold
+  # group key under the post-quantum per-operator multisig; this field records
+  # the cluster's ML-DSA-65 consensus public key.
+  [[ "$value" =~ ^(0x)?[0-9a-fA-F]{3904}$ ]] \
+    || fail "$label must be a 1952-byte ML-DSA-65 public key"
 }
 
 validate_signature() {
@@ -293,7 +296,7 @@ done
 validate_file_ref "dkg.transcript_file" "$dkg_transcript_file" "/var/lib/protocore/secrets/"
 validate_hash32 "dkg.transcript_sha256" "$dkg_transcript_sha"
 validate_hash32 "dkg.encrypted_share_bundle_hash" "$encrypted_share_bundle_hash"
-validate_bls_pubkey "dkg.group_public_key_hex" "$group_public_key_hex"
+validate_consensus_pubkey "dkg.group_public_key_hex" "$group_public_key_hex"
 validate_file_ref "sealed_share.file" "$sealed_share_file" "/var/lib/protocore/secrets/"
 validate_hash32 "sealed_share.sha256" "$sealed_share_sha"
 validate_hash32 "sealed_share.plaintext_share_hash" "$plaintext_share_hash"

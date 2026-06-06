@@ -135,7 +135,7 @@
         "transcript_file": { "type": "string", "pattern": "^/var/lib/protocore/secrets/.+" },
         "transcript_sha256": { "$ref": "#/$defs/hash32" },
         "encrypted_share_bundle_hash": { "$ref": "#/$defs/hash32" },
-        "group_public_key_hex": { "type": "string", "pattern": "^(0x)?[0-9a-fA-F]{96}$" }
+        "group_public_key_hex": { "type": "string", "pattern": "^(0x)?[0-9a-fA-F]{3904}$" }
       }
     },
     "sealed_share": {

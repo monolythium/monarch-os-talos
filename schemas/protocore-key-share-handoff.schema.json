@@ -164,7 +164,7 @@
       ],
       "properties": {
         "threshold_scheme": {
-          "const": "Ferveo-BLS12-381"
+          "const": "ML-DSA-65-bitmap-multisig"
         },
         "transcript_source_file": {
           "$ref": "#/$defs/protocore_secret_path"
@@ -186,7 +186,7 @@
         },
         "group_public_key_hex": {
           "type": "string",
-          "pattern": "^(0x)?[0-9a-fA-F]{96}$"
+          "pattern": "^(0x)?[0-9a-fA-F]{3904}$"
         }
       }
     },

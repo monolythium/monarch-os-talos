@@ -199,7 +199,7 @@ h6="$(printf '6%.0s' {1..64})"
 h7="$(printf '7%.0s' {1..64})"
 h8="$(printf '8%.0s' {1..64})"
 h9="$(printf '9%.0s' {1..64})"
-bls_pubkey="$(printf 'b%.0s' {1..96})"
+consensus_pubkey="$(printf 'b%.0s' {1..3904})"
 signature="$(printf 'a%.0s' {1..128})"
 
 valid_enrollment="$tmp_dir/enrollment-valid.json"
@@ -412,7 +412,7 @@ jq -n \
   --arg h5 "$h5" \
   --arg h6 "$h6" \
   --arg h7 "$h7" \
-  --arg bls_pubkey "$bls_pubkey" \
+  --arg consensus_pubkey "$consensus_pubkey" \
   --arg signature "$signature" \
   'def addr($i): [
       "0x1111111111111111111111111111111111111111",
@@ -461,14 +461,14 @@ jq -n \
         }
       ],
       dkg: {
-        threshold_scheme: "Ferveo-BLS12-381",
+        threshold_scheme: "ML-DSA-65-bitmap-multisig",
         previous_transcript_hash: $h0,
         next_transcript_file: "/var/lib/protocore/secrets/dkg-transcript-next.json",
         next_transcript_hash: $h5,
         transcript_commitment_hash: $h6,
         participant_commitments_hash: $h7,
         encrypted_share_bundle_hash: $h4,
-        group_public_key_hex: $bls_pubkey
+        group_public_key_hex: $consensus_pubkey
       },
       release: {
         metadata_sha256: $h0,

@@ -46,7 +46,7 @@ make run-key-share-ceremony \
   TPM_SEALING_EVIDENCE_FILES="./operator-0-tpm-seal.json ... ./operator-9-tpm-seal.json" \
   REQUIRE_DKG_RESHARE_ATTESTATION=true \
   DKG_RESHARE_INTENT_ID=7 \
-  DKG_RESHARE_BLS_PUBLIC_KEYS_HEX=0x... \
+  DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX=0x... \
   DKG_RESHARE_THRESHOLD_SIG_HEX=0x...
 ```
 
@@ -125,9 +125,11 @@ The manifest covers `initial-dkg`, `operator-rotation`, `share-reseal`,
 - cluster id, 10-member roster, 7-of-10 threshold, and DKG epoch transition;
 - the full active/standby operator roster with TPM mode, PCR quote hash,
   PCR event-log hash, and the sealed-share PCR policy hash;
-- Ferveo/BLS12-381 DKG transcript input/output hashes, transcript commitment
-  hash, participant-commitment bundle hash, encrypted-share bundle hash, and
-  resulting 48-byte BLS group public key;
+- key-transcript input/output hashes, transcript commitment hash,
+  participant-commitment bundle hash, encrypted-share bundle hash, and the
+  cluster's 1952-byte ML-DSA-65 consensus public key (there is no shared
+  threshold group key: consensus is per-operator ML-DSA-65 and a round
+  certificate is a 7-of-10 bitmap multisig);
 - one TPM-sealed share output for each operator index `0` through `9`, with
   each output bound back to that operator's TPM mode, PCR quote/event-log
   hashes, sealed-share policy hash, DKG transcript hash, and DKG epoch;
@@ -158,23 +160,25 @@ The on-chain lifecycle contract fields are:
 
 ## DKG Re-Share Attestation Artifact
 
-When the external DKG ceremony produces the participant BLS public keys and
-aggregate threshold signature for `attestDkgReshare`, render a Desktop-importable
-artifact:
+When the external roster-update ceremony produces the participant ML-DSA-65
+public keys and the per-signer signature set for `attestDkgReshare`, render a
+Desktop-importable artifact:
 
 ```bash
 make render-dkg-reshare-attestation \
   DKG_RESHARE_INTENT_ID=7 \
-  DKG_RESHARE_BLS_PUBLIC_KEYS_HEX=0x... \
+  DKG_RESHARE_CONSENSUS_PUBLIC_KEYS_HEX=0x... \
   DKG_RESHARE_THRESHOLD_SIG_HEX=0x... \
   DKG_RESHARE_ATTESTATION=./dkg-reshare-attestation.json
 ```
 
 The artifact is versioned as `monarch-dkg-reshare-attestation/v1`. The renderer
-rejects zero or out-of-range intent ids, malformed BLS key material, duplicate
-participant pubkeys, signer counts outside `5..7`, and non-96-byte threshold
-signatures. Monarch Desktop can import this JSON into the Rotate/DKG operation,
-then submit the operator-signed `attestDkgReshare(uint64,bytes,bytes)` tx.
+rejects zero or out-of-range intent ids, malformed key material, duplicate
+participant pubkeys, signer counts outside `5..7`, public keys that are not
+1952-byte ML-DSA-65 keys, and signature sets that are not one 3309-byte
+ML-DSA-65 signature per signer. Monarch Desktop can import this JSON into the
+Rotate operation, then submit the operator-signed
+`attestDkgReshare(uint64,bytes,bytes)` tx.
 
 ## Operator handoff/import bundle
 
