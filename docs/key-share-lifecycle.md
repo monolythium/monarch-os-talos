@@ -224,7 +224,7 @@ make validate-key-share-handoff \
 ```
 
 `LOCAL_EVIDENCE_ROOT` maps `/var/lib/protocore/...` paths to the mounted or
-copied evidence tree and verifies the imported TPM-sealed BLS share and DKG
+copied evidence tree and verifies the imported TPM-sealed consensus key and key
 transcript hashes before the node is allowed back into signing duty.
 
 The validators prove the ceremony manifest is structurally safe, the operator
