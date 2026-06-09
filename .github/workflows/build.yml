@@ -18,12 +18,12 @@ on:
       protocore_tag:
         description: "protocore release tag to embed"
         required: false
-        default: "v0.1.25-testnet"
+        default: "v0.1.44-testnet"
         type: string
       protocore_asset:
         description: "Linux protocore release asset"
         required: false
-        default: "protocore-v0.1.25-testnet-x86_64-linux.tar.gz"
+        default: "protocore-v0.1.44-testnet-x86_64-linux.tar.gz"
         type: string
       release_channel:
         description: "Release channel encoded into artifact metadata"
@@ -52,7 +52,7 @@ on:
       monarch_desktop_min_version:
         description: "Minimum compatible Monarch Desktop version"
         required: false
-        default: "0.0.11"
+        default: "0.0.12"
         type: string
       monarch_desktop_max_version:
         description: "Maximum compatible Monarch Desktop version"
@@ -127,8 +127,8 @@ jobs:
       - name: Download protocore release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PROTOCORE_TAG: ${{ github.event.inputs.protocore_tag || 'v0.1.25-testnet' }}
-          PROTOCORE_ASSET: ${{ github.event.inputs.protocore_asset || 'protocore-v0.1.25-testnet-x86_64-linux.tar.gz' }}
+          PROTOCORE_TAG: ${{ github.event.inputs.protocore_tag || 'v0.1.44-testnet' }}
+          PROTOCORE_ASSET: ${{ github.event.inputs.protocore_asset || 'protocore-v0.1.44-testnet-x86_64-linux.tar.gz' }}
         run: |
           set -euo pipefail
           mkdir -p _build/protocore-release _build/protocore-bin
@@ -163,7 +163,7 @@ jobs:
           CHAIN_ID: ${{ github.event.inputs.chain_id || '69420' }}
           GENESIS_TOML: ${{ github.event.inputs.genesis_toml || 'defaults/testnet/genesis.toml' }}
           MONARCH_DESKTOP_CHANNEL: ${{ github.event.inputs.release_channel || 'testnet' }}
-          MONARCH_DESKTOP_MIN_VERSION: ${{ github.event.inputs.monarch_desktop_min_version || '0.0.11' }}
+          MONARCH_DESKTOP_MIN_VERSION: ${{ github.event.inputs.monarch_desktop_min_version || '0.0.12' }}
           MONARCH_DESKTOP_MAX_VERSION: ${{ github.event.inputs.monarch_desktop_max_version || '<1.0.0' }}
           UPGRADE_REQUIRES_SAME_CHANNEL: "true"
           PROTOCORE_P2P_LISTEN: "/ip4/0.0.0.0/tcp/29898"
