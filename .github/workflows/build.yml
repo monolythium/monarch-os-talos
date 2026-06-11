@@ -18,12 +18,12 @@ on:
       protocore_tag:
         description: "protocore release tag to embed"
         required: false
-        default: "v0.1.45-testnet"
+        default: "v0.1.46-testnet"
         type: string
       protocore_asset:
         description: "Linux protocore release asset"
         required: false
-        default: "protocore-v0.1.45-testnet-x86_64-linux.tar.gz"
+        default: "protocore-v0.1.46-testnet-x86_64-linux.tar.gz"
         type: string
       release_channel:
         description: "Release channel encoded into artifact metadata"
@@ -127,8 +127,8 @@ jobs:
       - name: Download protocore release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PROTOCORE_TAG: ${{ github.event.inputs.protocore_tag || 'v0.1.45-testnet' }}
-          PROTOCORE_ASSET: ${{ github.event.inputs.protocore_asset || 'protocore-v0.1.45-testnet-x86_64-linux.tar.gz' }}
+          PROTOCORE_TAG: ${{ github.event.inputs.protocore_tag || 'v0.1.46-testnet' }}
+          PROTOCORE_ASSET: ${{ github.event.inputs.protocore_asset || 'protocore-v0.1.46-testnet-x86_64-linux.tar.gz' }}
         run: |
           set -euo pipefail
           mkdir -p _build/protocore-release _build/protocore-bin
