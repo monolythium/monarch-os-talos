@@ -47,3 +47,10 @@ logs/
 .build/
 _build/
 _out/
+
+# Local preview/build artifacts (never commit — multi-GB ISO/raw images)
+_build-local-preview/
+_build-local-preview-fixed/
+_out-local-preview/
+_out-local-preview-fixed/
+_build/
