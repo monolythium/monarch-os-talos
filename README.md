@@ -1,21 +1,21 @@
 # monarch-os-talos
 
-> Talos-based immutable node OS for [Monolythium](https://monolythium.com) operator infrastructure. Open-sourced for auditability; the signed-release pipeline is live and publishing cosign-signed preview ISOs.
+> Talos-based immutable node OS for [Monolythium](https://monolythium.com) operator infrastructure. Open-sourced for auditability; the signed-release pipeline is live and publishing cosign-signed production ISOs.
 
-**License:** Apache-2.0 · **Status:** preview bootstrap · **Base:** [Talos Linux](https://www.talos.dev/) `v1.13.0` · **Arch:** `amd64`
+**License:** Apache-2.0 · **Status:** `v0.1.0` — first production signed release (testnet) · **Base:** [Talos Linux](https://www.talos.dev/) `v1.13.0` · **Arch:** `amd64`
 
 ---
 
-## Status: preview bootstrap
+## Status: v0.1.0 — first production release
 
-This repository is published primarily for **auditability**. The OS recipe, the `monarch-protocore` Talos system extension entrypoint, build scripts, and the signed-release workflow shape are all here in source form. What is **not yet wired**:
+[`v0.1.0`](https://github.com/monolythium/monarch-os-talos/releases) is the first non-preview signed release: a cosign-verified ISO/raw image that bakes a signed `protocore` node binary, boots, **resolves the live genesis dynamically from the public [chain-registry](https://github.com/monolythium/chain-registry)** on first boot, and runs the node on testnet chain-69420. The end-to-end path from a blank machine to a signing cluster seat is documented in [`docs/operator-setup.md`](./docs/operator-setup.md).
 
-- **Signed ISO/raw release automation is live, and preview artifacts are published.** The GitHub Actions workflow downloads a signed `protocore` release asset, builds ISO/raw/extension artifacts with the local Makefile, emits SPDX SBOMs, and signs outputs with cosign keyless. Published `*-preview` releases carry cosign-signed ISOs (see [Trust model + verification](#trust-model--verification)). Preview releases are for auditability and boot testing, not production operation.
+Honest scope notes:
+
+- **Production for the testnet channel.** Mainnet promotion gates (hardware-TPM enrollment requirements, dm-verity root-hash pinning, full release rebuild witness) remain ahead — see [`docs/release-channels.md`](./docs/release-channels.md).
 - **External `make build` needs either a prebuilt `protocore` binary or a sibling core checkout.** The easiest public path is `PROTOCORE_BINARY=/path/to/protocore make build`.
 - **No `monarch-cli` extension is shipped in v1.** The node service is operated through Talos API and Monarch Desktop; any future on-node CLI package must be introduced as a real released extension, not a reserved placeholder.
-- **First-boot operator enrollment, secret injection, firewall enforcement, upgrade/rollback automation, SLSA-level provenance, release-channel promotion, configured QEMU/Desktop e2e, and final Desktop lifecycle hardening are all listed as missing or partial** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md). The image now creates its own sealed operator consensus identity on first boot; admission and cluster membership are separate chain/desktop flows.
-
-Watch this repo for the first non-preview tag before treating any output as production-grade.
+- **Remaining gaps are tracked openly** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md). The image creates its own sealed operator consensus identity on first boot; admission and cluster membership are separate chain/desktop flows.
 
 ---
 
@@ -23,7 +23,7 @@ Watch this repo for the first non-preview tag before treating any output as prod
 
 Monarch OS is a custom [Talos Linux](https://www.talos.dev/) distribution for Monolythium operator nodes. Talos is itself an API-driven immutable Linux that has no SSH, no shell, no package manager, and no traditional userspace; Monarch OS extends that base with two purpose-built Talos system extensions:
 
-- **`monarch-protocore`** — packages the `protocore` node binary, supervises it, optionally verifies its on-disk digest before start, creates a sealed per-node operator consensus identity on first boot, stages a Monolythium testnet genesis, and persists node state at `/var/lib/protocore`.
+- **`monarch-protocore`** — packages the `protocore` node binary, supervises it, optionally verifies its on-disk digest before start, creates a sealed per-node operator consensus identity on first boot, resolves the live genesis from the public chain-registry on first boot (falling back loudly to the baked genesis), and persists node state at `/var/lib/protocore`.
 - **No on-node Monarch CLI** — v1 intentionally keeps operator control in Monarch Desktop and the Talos API.
 
 Operators interact with a running Monarch OS node from a separate workstation through:
@@ -97,7 +97,7 @@ monarch-os-talos/
 │   ├── operator-runbooks.md            # preview verify / install / enroll / operate / incident runbooks
 │   ├── monarch-desktop-connectivity.md # operator workstation → node provisioning
 │   └── upgrade-and-storage.md          # how nodes install, persist data, and upgrade
-└── .github/workflows/build.yml  # signed-release pipeline (live; publishes signed preview ISOs)
+└── .github/workflows/build.yml  # signed-release pipeline (live; publishes signed ISOs)
 ```
 
 ## Prerequisites
@@ -360,9 +360,10 @@ harness exits.
 
 ## Trust model + verification
 
-The signed-release pipeline is live. Published `*-preview` releases on
+The signed-release pipeline is live. Published releases on
 [**`monolythium/monarch-os-talos`**](https://github.com/monolythium/monarch-os-talos/releases)
-ship a cosign-signed ISO. Each release artifact carries:
+(`v0.1.0` production and the earlier `*-preview` series) ship a cosign-signed ISO.
+Each release artifact carries:
 
 - A **cosign keyless signature** (Sigstore via GitHub OIDC) — the `.sig` + `.pem`
   pair next to each artifact, verifiable with the `cosign verify-blob` flow below.
@@ -392,10 +393,10 @@ ship a cosign-signed ISO. Each release artifact carries:
   digest, healthy Talos/Protocore readiness, successful Talos restart receipt,
   and verified two-operator chat exchange.
 
-> **Preview, not production.** Preview ISOs are published for auditability and
-> boot testing. Check the `sources.protocore_binary` and genesis fields in the
-> `*.release.json` before using a build against a live testnet. A non-preview ISO
-> with full promotion evidence is still the production milestone.
+> **Always check the release metadata.** Check the `sources.protocore_binary`
+> and genesis fields in the `*.release.json` before using a build against a live
+> testnet. `v0.1.0` and later are production releases for the testnet channel;
+> `*-preview` tags remain auditability/boot-testing builds.
 
 ### cosign certificate identity
 
@@ -410,7 +411,7 @@ Fulcio certificate binds to:
 Requires [`cosign`](https://github.com/sigstore/cosign) and the [`gh`](https://cli.github.com/) CLI.
 
 ```bash
-TAG=v0.0.4-preview
+TAG=v0.1.0
 ISO=monarch-os-talos-v1.13.0-amd64.iso
 
 # 1. Download the ISO, its checksum, signature, and signing certificate.
@@ -443,6 +444,7 @@ cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protoc
 
 ## Documentation
 
+- [`docs/operator-setup.md`](./docs/operator-setup.md) — **the canonical "run a Monolythium operator node" guide**: verify the signed ISO, flash/boot (bare-metal or cloud), first-boot dynamic genesis resolution, install Monarch Desktop, the ten-step welcome checklist, and join-vs-form-a-cluster.
 - [`docs/install.md`](./docs/install.md) — install a node on **home / bare-metal** (old PC, NUC, laptop — the hardware-TPM sovereignty path) or the **top cloud providers** (Hetzner, DigitalOcean, AWS, GCP, Vultr) from the signed ISO / `raw.xz`. Verify → write → boot → sync, plus the cloud-vs-bare-metal trust posture.
 - [`docs/enrollment-manifest.md`](./docs/enrollment-manifest.md) — first-boot enrollment manifest schema and local validator.
 - [`docs/key-share-lifecycle.md`](./docs/key-share-lifecycle.md) — DKG/key-share rotation, recovery, reseal, and revocation ceremony schema and validator.
@@ -457,9 +459,9 @@ cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protoc
 - [`docs/operator-runbooks.md`](./docs/operator-runbooks.md) — preview operator runbooks for verifying artifacts, installing, enrolling, connecting Desktop, operating, upgrading, recovering, rotating, and responding to incidents.
 - [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) — comprehensive gap list. What's missing across release artifacts, provisioning, secret handling, network policy, health model, upgrade/rollback, recovery, desktop client, security posture, test coverage, and operator docs. Followed by a phased build plan.
 
-The repo runbooks are still preview documentation. Production operator docs will
-be published at [docs.monolythium.com](https://docs.monolythium.com) once the
-first non-preview signed release ships.
+Operator docs are also published at
+[docs.monolythium.com](https://docs.monolythium.com); the repo docs above remain
+the source-adjacent reference.
 
 ## Release pipeline status
 
@@ -477,7 +479,7 @@ first non-preview signed release ships.
    `KEEP_QEMU_ALIVE=true`.
 9. On tag push (`v*`) or manual dispatch with a tag, create a draft GitHub Release with the artifacts attached.
 
-This pipeline has shipped: the `*-preview` releases were published from it, each with a cosign-signed ISO, SPDX SBOM, and release metadata. Releases are cut as drafts and then promoted to pre-release; the non-preview milestone is the first ISO rebuilt on the live testnet binary + genesis.
+This pipeline has shipped: `v0.1.0` — the first production (non-preview) release, built on the live testnet binary and resolving the live genesis — and the earlier `*-preview` series were all published from it, each with a cosign-signed ISO, SPDX SBOM, and release metadata.
 
 ## Related projects
 
