@@ -154,6 +154,15 @@ download_attestation_bundle() {
   local file="$1"
   mkdir -p "$ATTESTATION_BUNDLE_DIR"
   (cd "$ATTESTATION_BUNDLE_DIR" && gh attestation download "$file" -R "$GITHUB_REPOSITORY" >/dev/null)
+  # `gh attestation download` names bundles `sha256:<digest>.jsonl`. The colon
+  # is rejected by actions/upload-artifact@v4, so normalize to the dash form
+  # (`sha256-<digest>.jsonl`) that bundle_path_for already resolves.
+  local digest
+  digest="$(sha256sum "$file" | awk '{print $1}')"
+  local colon_path="$ATTESTATION_BUNDLE_DIR/sha256:$digest.jsonl"
+  if [[ -f "$colon_path" ]]; then
+    mv "$colon_path" "$ATTESTATION_BUNDLE_DIR/sha256-$digest.jsonl"
+  fi
 }
 
 verify_github_attestation() {
