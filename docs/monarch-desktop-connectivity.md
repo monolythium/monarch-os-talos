@@ -17,19 +17,28 @@ The OS image intentionally ships without:
 - operator key material
 - default SSH access
 
-On first boot the entrypoint creates a per-node keystore passphrase under `/var/lib/protocore/keystore/passphrase`, writes `config.toml` with `node.mode = "operator"`, and runs `protocore registry gen-operator-keys` to seal the ML-DSA operator consensus seed at `/var/lib/protocore/operator/consensus.key.enc`. Set `PROTOCORE_NODE_MODE=full` only for non-signing RPC/indexer nodes.
+A freshly flashed node boots **enrollment-free**: it comes up as a full node (`node.mode = "full"`) and syncs the chain out of the box, with no enrollment bundle and no TPM binding required. Operator-signing enrollment — the per-node sealed ML-DSA operator consensus identity, keystore passphrase, and TPM binding — is an explicit **opt-in** staged later by an operator who intends to stake (see [`operator-setup.md`](./operator-setup.md)). When you opt in, set `PROTOCORE_NODE_MODE=operator` and stage the enrollment material described in [`operator-runbooks.md`](./operator-runbooks.md).
 
-## Provisioning Flow
+## Provisioning Flow (in-app with Monarch Desktop)
 
-1. Build or download a signed Monarch OS artifact.
+Monarch Desktop provisions the node for you — operators no longer run `talosctl` by hand.
 
-   ```bash
-   make build
-   ```
+1. Build or download a signed Monarch OS artifact and flash it to the target machine. It boots into **Talos maintenance mode** and waits for a machine config.
 
-2. Boot the ISO or raw image on the target machine.
+2. In Monarch Desktop, **connect by IP**. Desktop auto-detects the unprovisioned node in maintenance mode and branches on whether you are setting up a **relay / full node** (the default) or an operator node.
 
-3. Generate a Talos machine config for the node.
+3. Pick the **install disk**. Desktop generates the full Talos cluster PKI and a full-node machine config (with the `monarch-protocore` extension service config), applies it over the maintenance API, and reboots the node.
+
+4. Desktop **polls `http://<node-ip>:8545`** until the node is up and syncing. From there it connects over:
+
+   - the node Talos endpoint: `https://<node-ip>:50000` (mTLS, control plane)
+   - the Protocore RPC endpoint: `http://<node-ip>:8545` or the private tunnel/WireGuard address used by the operator network (data plane)
+
+### Manual fallback (`talosctl` by hand)
+
+If you can't use Desktop, provision over the Talos maintenance API directly:
+
+1. Generate a Talos machine config:
 
    ```bash
    talosctl gen config monarch-node https://<node-ip>:6443 \
@@ -38,52 +47,19 @@ On first boot the entrypoint creates a per-node keystore passphrase under `/var/
      --output ./cluster-config
    ```
 
-4. Add the `protocore` extension service config to the Talos machine config. Start from:
+2. Add the `protocore` extension service config to the machine config. Start from `examples/protocore-extension-service-config.yaml`. Do not put passphrases, mnemonics, private keys, or key shares directly in `environment:` — the `protocore-entrypoint` rejects known inline secret env vars and placeholder values at start, and `make verify-artifacts REQUIRE_PROVISIONING_POLICY=true` checks the shipped service config does the same. (To stage operator-signing enrollment later, validate the manifest first with `make validate-enrollment-manifest ENROLLMENT_MANIFEST=./enrollment.json EXPECTED_CHAIN_PROFILE=testnet EXPECTED_CHAIN_ID=69420 REQUIRE_RELEASE_DIGEST=true`.)
+
+3. Apply the config and confirm the extension and service:
 
    ```bash
-   examples/protocore-extension-service-config.yaml
-   ```
-
-   The example uses file paths for enrollment material and release digests, and defaults `PROTOCORE_NODE_MODE=operator`. Do not put passphrases, mnemonics, private keys, or key shares directly in `environment:`. The `protocore-entrypoint` rejects known inline secret env vars and placeholder values at start; `make verify-artifacts REQUIRE_PROVISIONING_POLICY=true` checks the shipped service config does the same.
-
-   Validate enrollment manifests before copying them to the node:
-
-   ```bash
-   make validate-enrollment-manifest \
-     ENROLLMENT_MANIFEST=./enrollment.json \
-     EXPECTED_CHAIN_PROFILE=testnet \
-     EXPECTED_CHAIN_ID=69420 \
-     REQUIRE_RELEASE_DIGEST=true
-   ```
-
-5. Apply the machine config.
-
-   ```bash
-   talosctl apply-config \
-     --nodes <node-ip> \
-     --endpoints <node-ip> \
-     --insecure \
+   talosctl apply-config --nodes <node-ip> --endpoints <node-ip> --insecure \
      --file ./cluster-config/controlplane.yaml
-   ```
-
-6. Confirm the Monarch extension is present.
-
-   ```bash
    talosctl --nodes <node-ip> --endpoints <node-ip> get extensions
-   ```
-
-7. Confirm the service is waiting for config or running.
-
-   ```bash
    talosctl --nodes <node-ip> --endpoints <node-ip> service ext-protocore
    talosctl --nodes <node-ip> --endpoints <node-ip> logs ext-protocore
    ```
 
-8. Point Monarch Desktop at:
-
-   - the node Talos endpoint: `https://<node-ip>:50000`
-   - the generated `talosconfig`
-   - the Protocore RPC endpoint: `http://<node-ip>:8545` or the private tunnel/WireGuard address used by the operator network
+4. Point Monarch Desktop at the Talos endpoint (`https://<node-ip>:50000`), the generated `talosconfig`, and the Protocore RPC endpoint (`http://<node-ip>:8545`).
 
 ## Persistence and Upgrades
 

@@ -51,8 +51,11 @@ minimal state where the node does nothing except wait for a configuration over i
 API.
 
 You then send the node a **machine config** (a YAML document that declares how the
-node should be set up, including which disk to install to). The relevant field is
-the install disk, e.g.:
+node should be set up, including which disk to install to). The recommended way is
+**in-app with Monarch Desktop** — connect by IP, pick the install disk, and Desktop
+generates the Talos PKI + full-node config, applies it, and reboots the node (see
+[`monarch-desktop-connectivity.md`](./monarch-desktop-connectivity.md)). The manual
+equivalent declares the install disk directly:
 
 ```bash
 talosctl gen config monarch-node https://<node-ip>:6443 --install-disk /dev/sda
@@ -61,13 +64,14 @@ talosctl apply-config --insecure --nodes <node-ip> --file controlplane.yaml
 
 (`talosctl` is the command-line client for talking to a Talos/Monarch OS node over
 its API — there is no SSH.) On receiving the config, the node **installs the OS onto
-the internal disk** (`/dev/sda` here) and reboots.
+the internal disk** (`/dev/sda` here) and reboots, then boots enrollment-free and
+syncs as a full node.
 
 After that first install, **the ISO is no longer needed** — you can remove the USB
 stick or detach the virtual media. The node boots from its internal disk from then on.
 
 > A node can technically run disk-less (booted entirely into RAM over the network),
-> but a validator that stores chain history should install to a disk so the data
+> but a node that stores chain history should install to a disk so the data
 > persists.
 
 ### 2. Run (from the internal disk)
@@ -147,7 +151,7 @@ talosctl upgrade --nodes <node-ip> --image <new-signed-image-reference>
 The node downloads the new image, writes it to the boot partition, and reboots into
 it. Crucially, the upgrade **replaces the OS partitions but keeps the data partition
 (`/var`) intact** — Talos exposes an explicit "preserve" control for exactly this, and
-preserving state is the required setting for a stateful node like a validator. So
+preserving state is the required setting for a stateful node like an operator. So
 `/var/lib/protocore` — config, keys, and the full chain database — is carried across
 the upgrade untouched.
 

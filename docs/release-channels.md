@@ -58,7 +58,7 @@ make check-channel-promotion \
 To fetch the evidence from a Monarch Desktop release before promotion:
 
 ```bash
-DESKTOP_E2E_RELEASE_TAG=v0.1.0 \
+DESKTOP_E2E_RELEASE_TAG=v0.0.20 \
   make resolve-desktop-e2e \
     PROMOTION_METADATA=_out/monarch-os-talos-v1.13.0-amd64.release.json
 ```

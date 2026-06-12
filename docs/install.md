@@ -1,6 +1,6 @@
 # Installing a Monolythium node (Monarch OS)
 
-Monarch OS is an immutable, signed Talos-based OS that boots straight into a Monolythium `protocore` node. This guide covers **home / bare-metal** (an old PC, NUC, or laptop) and the **top cloud providers**. Whatever the substrate, the install is: *verify the signed image → write it to a disk → boot → the node syncs chain-69420*.
+Monarch OS is an immutable, signed Talos-based OS that boots straight into a Monolythium `protocore` node. This guide covers **home / bare-metal** (an old PC, NUC, or laptop) and the **top cloud providers**. Whatever the substrate, the install is: *verify the signed image → write it to a disk → boot into Talos maintenance mode → provision it in-app with Monarch Desktop → the node syncs chain-69420 as a full node*. A freshly flashed node syncs **enrollment-free** — no enrollment bundle or TPM binding is required to run a full node.
 
 > **Artifacts** (on each [release](https://github.com/monolythium/monarch-os-talos/releases)):
 > - `monarch-os-talos-<ver>-amd64.iso` — bootable installer (bare-metal / USB).
@@ -25,7 +25,7 @@ Both run the same signed image; the difference is the boot-time root of trust. C
 Requires [`cosign`](https://github.com/sigstore/cosign) and [`gh`](https://cli.github.com/).
 
 ```bash
-TAG=<release-tag>            # e.g. v0.0.5-preview
+TAG=<release-tag>            # e.g. v0.1.3
 ARCH=amd64
 BASE=monarch-os-talos-v1.13.0-$ARCH
 
@@ -56,8 +56,8 @@ Ideal target: any 64-bit PC / NUC / mini-PC / laptop from ~2016+ (most have firm
    ```
    (or use balenaEtcher / Rufus.)
 2. **Enable TPM 2.0 + UEFI** in the machine's BIOS (and Secure Boot if available — this is what gives the home path its hardware root of trust).
-3. **Boot from USB.** Talos installs to the internal disk and reboots into the immutable OS; blockchain state persists at `/var/lib/protocore`. See [`docs/upgrade-and-storage.md`](./upgrade-and-storage.md) for the disk/persistence/upgrade model.
-4. The node comes up, stages the baked testnet genesis, and starts syncing chain-69420. Verify with §4.
+3. **Boot from USB.** The node comes up in **Talos maintenance mode** — it waits for a machine config over its API and installs nothing on its own.
+4. **Provision it in-app with Monarch Desktop** (recommended — see §5): connect by IP, let Desktop detect the unprovisioned node, pick the install disk, and Desktop generates the Talos PKI + full-node config, applies it, and reboots. The node then installs to the internal disk, comes up enrollment-free, resolves the genesis from the chain-registry, and syncs chain-69420; blockchain state persists at `/var/lib/protocore`. See [`docs/upgrade-and-storage.md`](./upgrade-and-storage.md) for the disk/persistence/upgrade model. Verify with §4.
 
 This is the substrate the protocol is designed around for signing operators — residential connectivity (NAT, dynamic IP) is supported by design, so a home box behind a normal router is fine.
 
@@ -138,20 +138,25 @@ Vultr can upload a **custom ISO by URL** and boot it directly (no snapshot dance
 RPC=http://<your-node-ip>:8545
 curl -s $RPC -d '{"jsonrpc":"2.0","id":1,"method":"lyth_runtimeProvenance","params":[]}'
 ```
-Check that `genesisHash` and `chainId` match the canonical [`chain-registry/chains/testnet-69420.toml`](https://github.com/monolythium/chain-registry/blob/master/chains/testnet-69420.toml), and that `eth_blockNumber` advances over time (the node is catching up to the live tip). Peers come from the chain-registry's published libp2p multiaddrs.
+Check that `genesisHash` and `chainId` match the canonical [`chain-registry/chains/testnet-69420.toml`](https://github.com/monolythium/chain-registry/blob/master/chains/testnet-69420.toml) (the binding source of truth — don't hardcode the genesis, the chain re-genesises), and that `eth_blockNumber` advances over time (the node is catching up to the live tip). Peers come from the chain-registry's published libp2p multiaddrs.
 
 ---
 
-## 5. Become an operator
+## 5. Provision with Monarch Desktop (the in-app flow)
 
-Running a synced node is step one. Operator-signing enrollment is still a preview
-path: validate an enrollment manifest, stage the required file references under
-`/var/lib/protocore`, and let the extension fail closed if release digest, TPM,
-or key-share evidence is missing. Reminder on trust posture (§0): for **mainnet
-signing** you want a **bare-metal TPM-2.0** box; cloud/vTPM is fine for the
-testnet release candidate.
+A freshly flashed node boots into **Talos maintenance mode** and does nothing until it is provisioned. The recommended path is **in-app provisioning** with [**Monarch Desktop**](https://github.com/monolythium/monarch-desktop/releases) (v0.0.20 or later) — operators no longer run `talosctl` by hand:
 
-See [`operator-runbooks.md`](./operator-runbooks.md) for the current preview
-enrollment and cluster-onboarding workflow. Production operator docs will be
-published at [docs.monolythium.com](https://docs.monolythium.com) after the
-final on-chain enrollment, rotation, and recovery flows are wired.
+1. **Connect by IP.** Enter the node's address; Desktop auto-detects that it is an unprovisioned node in maintenance mode.
+2. **Choose what it is.** Pick a **full node / relay** (the default — no enrollment, no TPM) or, if you intend to stake, an operator node, then pick the install disk.
+3. **Apply.** Desktop generates the full Talos cluster PKI and a full-node machine config, applies it over the maintenance API, and reboots the node.
+4. **Sync.** Desktop polls `:8545` until the node is up; it resolves the genesis from the chain-registry and syncs chain-69420 enrollment-free.
+
+> **Manual fallback.** If you can't use Desktop, you can provision by hand with `talosctl` (`gen config` → add the `monarch-protocore` extension service config → `apply-config`); see [`monarch-desktop-connectivity.md`](./monarch-desktop-connectivity.md) and [`operator-runbooks.md`](./operator-runbooks.md). The in-app flow is preferred and is what these docs target.
+
+---
+
+## 6. Become an operator (opt-in)
+
+Running a synced full node is the default and is complete on its own. **Operator-signing enrollment and TPM binding are opt-in** — they are the explicit upgrade from a plain sync-full node to a node that holds a signing seat. An operator stages the enrollment bundle, registers and bonds, and joins or forms a cluster; the extension fails closed if the release digest, TPM, or key-share evidence the bundle pins is missing. Reminder on trust posture (§0): for **mainnet signing** you want a **bare-metal TPM-2.0** box; cloud/vTPM is fine for the testnet release candidate.
+
+The end-to-end operator path (key, bond, register, cluster) is the welcome checklist in [`operator-setup.md`](./operator-setup.md#4-become-an-operator--the-opt-in-enrollment-path); the enrollment-bundle machinery and cluster-onboarding workflow are in [`operator-runbooks.md`](./operator-runbooks.md). Production operator docs are also published at [docs.monolythium.com](https://docs.monolythium.com).

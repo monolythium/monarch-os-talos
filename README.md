@@ -2,20 +2,21 @@
 
 > Talos-based immutable node OS for [Monolythium](https://monolythium.com) operator infrastructure. Open-sourced for auditability; the signed-release pipeline is live and publishing cosign-signed production ISOs.
 
-**License:** Apache-2.0 · **Status:** `v0.1.0` — first production signed release (testnet) · **Base:** [Talos Linux](https://www.talos.dev/) `v1.13.0` · **Arch:** `amd64`
+**License:** Apache-2.0 · **Status:** `v0.1.3` — signed testnet release · **Base:** [Talos Linux](https://www.talos.dev/) `v1.13.0` · **Arch:** `amd64`
 
 ---
 
-## Status: v0.1.0 — first production release
+## Status: v0.1.3 — signed testnet release
 
-[`v0.1.0`](https://github.com/monolythium/monarch-os-talos/releases) is the first non-preview signed release: a cosign-verified ISO/raw image that bakes a signed `protocore` node binary, boots, **resolves the live genesis dynamically from the public [chain-registry](https://github.com/monolythium/chain-registry)** on first boot, and runs the node on testnet chain-69420. The end-to-end path from a blank machine to a signing cluster seat is documented in [`docs/operator-setup.md`](./docs/operator-setup.md).
+[`v0.1.3`](https://github.com/monolythium/monarch-os-talos/releases) is a cosign-verified ISO/raw image that bakes the signed `protocore v0.1.51-testnet` node binary, boots **enrollment-free**, **resolves the live genesis dynamically from the public [chain-registry](https://github.com/monolythium/chain-registry)** on first boot, and syncs as a full node on testnet chain-69420 (genesis `0x11774775`; the chain-registry pin is the binding source of truth for the genesis and binary digest). The end-to-end path from a blank machine to a signing cluster seat is documented in [`docs/operator-setup.md`](./docs/operator-setup.md).
 
 Honest scope notes:
 
-- **Production for the testnet channel.** Mainnet promotion gates (hardware-TPM enrollment requirements, dm-verity root-hash pinning, full release rebuild witness) remain ahead — see [`docs/release-channels.md`](./docs/release-channels.md).
+- **Enrollment-free by default.** A freshly flashed node boots into Talos maintenance mode, is provisioned in-app by Monarch Desktop, and syncs as a full node with **no enrollment bundle and no TPM binding required**. Operator-signing enrollment and TPM binding are an explicit **opt-in** staged later by an operator — see [`docs/operator-setup.md`](./docs/operator-setup.md).
+- **Testnet channel.** Mainnet promotion gates (hardware-TPM enrollment requirements, dm-verity root-hash pinning, full release rebuild witness) remain ahead — see [`docs/release-channels.md`](./docs/release-channels.md).
 - **External `make build` needs either a prebuilt `protocore` binary or a sibling core checkout.** The easiest public path is `PROTOCORE_BINARY=/path/to/protocore make build`.
 - **No `monarch-cli` extension is shipped in v1.** The node service is operated through Talos API and Monarch Desktop; any future on-node CLI package must be introduced as a real released extension, not a reserved placeholder.
-- **Remaining gaps are tracked openly** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md). The image creates its own sealed operator consensus identity on first boot; admission and cluster membership are separate chain/desktop flows.
+- **Remaining gaps are tracked openly** in [`docs/final-product-readiness.md`](./docs/final-product-readiness.md). The image syncs as a full node out of the box; admission and cluster membership are separate, opt-in chain/desktop flows.
 
 ---
 
@@ -23,7 +24,7 @@ Honest scope notes:
 
 Monarch OS is a custom [Talos Linux](https://www.talos.dev/) distribution for Monolythium operator nodes. Talos is itself an API-driven immutable Linux that has no SSH, no shell, no package manager, and no traditional userspace; Monarch OS extends that base with two purpose-built Talos system extensions:
 
-- **`monarch-protocore`** — packages the `protocore` node binary, supervises it, optionally verifies its on-disk digest before start, creates a sealed per-node operator consensus identity on first boot, resolves the live genesis from the public chain-registry on first boot (falling back loudly to the baked genesis), and persists node state at `/var/lib/protocore`.
+- **`monarch-protocore`** — packages the `protocore` node binary, supervises it, optionally verifies its on-disk digest before start, resolves the live genesis from the public chain-registry on first boot (falling back loudly to the baked genesis), boots **enrollment-free** as a full node, and persists node state at `/var/lib/protocore`. Operator-signing enrollment (a sealed per-node operator consensus identity, TPM binding) is an explicit opt-in staged later.
 - **No on-node Monarch CLI** — v1 intentionally keeps operator control in Monarch Desktop and the Talos API.
 
 Operators interact with a running Monarch OS node from a separate workstation through:
@@ -398,7 +399,7 @@ hand-editing the staged genesis.
 
 The signed-release pipeline is live. Published releases on
 [**`monolythium/monarch-os-talos`**](https://github.com/monolythium/monarch-os-talos/releases)
-(`v0.1.0` production and the earlier `*-preview` series) ship a cosign-signed ISO.
+(`v0.1.3` and the earlier signed series) ship a cosign-signed ISO.
 Each release artifact carries:
 
 - A **cosign keyless signature** (Sigstore via GitHub OIDC) — the `.sig` + `.pem`
@@ -431,7 +432,7 @@ Each release artifact carries:
 
 > **Always check the release metadata.** Check the `sources.protocore_binary`
 > and genesis fields in the `*.release.json` before using a build against a live
-> testnet. `v0.1.0` and later are production releases for the testnet channel;
+> testnet. `v0.1.3` and later are signed releases for the testnet channel;
 > `*-preview` tags remain auditability/boot-testing builds.
 
 ### cosign certificate identity
@@ -447,7 +448,7 @@ Fulcio certificate binds to:
 Requires [`cosign`](https://github.com/sigstore/cosign) and the [`gh`](https://cli.github.com/) CLI.
 
 ```bash
-TAG=v0.1.0
+TAG=v0.1.3
 ISO=monarch-os-talos-v1.13.0-amd64.iso
 
 # 1. Download the ISO, its checksum, signature, and signing certificate.
@@ -490,7 +491,7 @@ cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protoc
 - [`docs/release-channels.md`](./docs/release-channels.md) — dev/testnet/mainnet promotion policy and the local promotion check.
 - [`docs/network-policy.md`](./docs/network-policy.md) — default Talos/Protocore ports, prohibited production surfaces, and release verifier enforcement.
 - [`docs/provenance-and-rebuild.md`](./docs/provenance-and-rebuild.md) — operator-side signature checks, GitHub attestation verification, offline attestation bundles, source lineage checks, and clean rebuild comparison.
-- [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) — how an operator workstation provisions a Monarch OS node over Talos API mTLS + Protocore JSON-RPC; what the OS image does and does not ship: no SSH, no operator keystore passphrases, no shipped key material, and a per-node operator identity generated on first boot.
+- [`docs/monarch-desktop-connectivity.md`](./docs/monarch-desktop-connectivity.md) — how Monarch Desktop provisions a Monarch OS node in-app (connect by IP → pick disk → apply → sync) over Talos API mTLS + Protocore JSON-RPC, with a manual `talosctl` fallback; what the OS image does and does not ship: no SSH, no operator keystore passphrases, no shipped key material; the node boots enrollment-free as a full node and operator-signing identity is opt-in.
 - [`docs/upgrade-and-storage.md`](./docs/upgrade-and-storage.md) — how a node installs from the ISO to an internal disk, where blockchain data is stored (`/var/lib/protocore` on the persistent partition), and how upgrades swap the OS image while preserving node state. Buzzwords explained.
 - [`docs/operator-runbooks.md`](./docs/operator-runbooks.md) — preview operator runbooks for verifying artifacts, installing, enrolling, connecting Desktop, operating, upgrading, recovering, rotating, and responding to incidents.
 - [`docs/final-product-readiness.md`](./docs/final-product-readiness.md) — comprehensive gap list. What's missing across release artifacts, provisioning, secret handling, network policy, health model, upgrade/rollback, recovery, desktop client, security posture, test coverage, and operator docs. Followed by a phased build plan.
@@ -515,7 +516,7 @@ the source-adjacent reference.
    `KEEP_QEMU_ALIVE=true`.
 9. On tag push (`v*`) or manual dispatch with a tag, create a draft GitHub Release with the artifacts attached.
 
-This pipeline has shipped: `v0.1.0` — the first production (non-preview) release, built on the live testnet binary and resolving the live genesis — and the earlier `*-preview` series were all published from it, each with a cosign-signed ISO, SPDX SBOM, and release metadata.
+This pipeline has shipped: `v0.1.3` — built on the signed `protocore v0.1.51-testnet` binary, booting enrollment-free, and resolving the live genesis from the chain-registry — alongside the earlier signed series, each with a cosign-signed ISO, SPDX SBOM, and release metadata.
 
 ## Related projects
 
