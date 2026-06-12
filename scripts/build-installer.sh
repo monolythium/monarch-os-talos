@@ -23,6 +23,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="${OUT_DIR:-$ROOT_DIR/_out}"
+# docker -v requires an absolute path (a relative one becomes a named volume).
+[[ "$OUT_DIR" = /* ]] || OUT_DIR="$ROOT_DIR/$OUT_DIR"
 TALOS_VERSION="${TALOS_VERSION:-v1.13.0}"
 ARCH="${ARCH:-amd64}"
 IMAGER_IMAGE="${IMAGER_IMAGE:-ghcr.io/siderolabs/imager:$TALOS_VERSION}"
