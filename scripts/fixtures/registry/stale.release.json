@@ -1,0 +1,22 @@
+{
+  "schema_version": "monarch-os-release-metadata/v1",
+  "channel": {
+    "name": "testnet",
+    "chain": {
+      "profile": "testnet",
+      "chain_id": "11111",
+      "genesis": {
+        "path": "defaults/testnet/genesis.toml",
+        "sha256": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef0",
+        "embedded_in_extension": true
+      }
+    }
+  },
+  "sources": {
+    "protocore_binary": {
+      "source": "local",
+      "path": "protocore",
+      "sha256": "cafebabecafebabecafebabecafebabecafebabecafebabecafebabecafebabe"
+    }
+  }
+}

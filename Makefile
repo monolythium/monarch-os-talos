@@ -6,6 +6,10 @@ RELEASE_CHANNEL ?= testnet
 CHAIN_PROFILE ?= testnet
 CHAIN_ID ?= 69420
 GENESIS_TOML ?= defaults/$(CHAIN_PROFILE)/genesis.toml
+REGISTRY_NETWORK ?= testnet-69420
+REGISTRY_REF ?= master
+PROTOCORE_TAG ?=
+RELEASE_JSON ?=
 KERNEL_BASELINE_FILE ?= kernel-hardening-baseline.json
 DM_VERITY_EXPECTED_ROOT_HASHES ?=
 DM_VERITY_SUBSTRATE_PROOF ?= $(OUT_DIR)/smoke-qemu/substrate-runtime.json
@@ -207,21 +211,30 @@ GCP_NETWORK ?= default
 GCP_TARGET_TAGS ?= monarch-os
 VULTR_FIREWALL_GROUP_ID ?=
 
-.PHONY: build iso metal extension metadata dm-verity-root-hashes extension-rebuild-witness release-rebuild-witness verify-artifacts verify-provenance verify-desktop-e2e resolve-desktop-e2e check-upgrade-readiness upgrade-plan fleet-upgrade-plan test-upgrade-plan test-fleet-upgrade-plan check-channel-promotion validate-enrollment-manifest validate-tpm-attestation-evidence run-on-chain-enrollment validate-tpm-sealing-evidence validate-key-share-ceremony run-key-share-ceremony run-production-dkg-ceremony render-key-share-handoff render-dkg-reshare-attestation validate-key-share-handoff test-on-chain-enrollment-runner test-key-share-ceremony-runner test-production-dkg-ceremony-runner test-key-share-handoff test-dkg-reshare-attestation test-enrollment-and-key-share-validators test-tpm-sealing-evidence validate-operator-audit-trail test-operator-audit-trail validate-talos-certificate-rotation test-talos-certificate-rotation validate-incident-response test-incident-response validate-disaster-recovery test-disaster-recovery protocore-offline-backup protocore-offline-restore test-protocore-offline-backup test-protocore-offline-restore network-firewall-policy hcloud-firewall-policy cloud-firewall-policy test-network-firewall-policy smoke-qemu-config smoke-qemu smoke-qemu-artifact clean sbom
+.PHONY: build iso metal extension metadata verify-registry-match sync-genesis-from-registry test-verify-registry-match dm-verity-root-hashes extension-rebuild-witness release-rebuild-witness verify-artifacts verify-provenance verify-desktop-e2e resolve-desktop-e2e check-upgrade-readiness upgrade-plan fleet-upgrade-plan test-upgrade-plan test-fleet-upgrade-plan check-channel-promotion validate-enrollment-manifest validate-tpm-attestation-evidence run-on-chain-enrollment validate-tpm-sealing-evidence validate-key-share-ceremony run-key-share-ceremony run-production-dkg-ceremony render-key-share-handoff render-dkg-reshare-attestation validate-key-share-handoff test-on-chain-enrollment-runner test-key-share-ceremony-runner test-production-dkg-ceremony-runner test-key-share-handoff test-dkg-reshare-attestation test-enrollment-and-key-share-validators test-tpm-sealing-evidence validate-operator-audit-trail test-operator-audit-trail validate-talos-certificate-rotation test-talos-certificate-rotation validate-incident-response test-incident-response validate-disaster-recovery test-disaster-recovery protocore-offline-backup protocore-offline-restore test-protocore-offline-backup test-protocore-offline-restore network-firewall-policy hcloud-firewall-policy cloud-firewall-policy test-network-firewall-policy smoke-qemu-config smoke-qemu smoke-qemu-artifact clean sbom
 
 build: iso metal
 
-iso:
+iso: | verify-registry-match
 	env TALOS_VERSION="$(TALOS_VERSION)" ARCH="$(ARCH)" MONO_CORE_DIR="$(MONO_CORE_DIR)" OUT_DIR="$(OUT_DIR)" CHAIN_PROFILE="$(CHAIN_PROFILE)" CHAIN_ID="$(CHAIN_ID)" GENESIS_TOML="$(GENESIS_TOML)" DM_VERITY_EXPECTED_ROOT_HASHES="$(DM_VERITY_EXPECTED_ROOT_HASHES)" PROTOCORE_P2P_LISTEN="$(PROTOCORE_P2P_LISTEN)" PROTOCORE_RPC_LISTEN="$(PROTOCORE_RPC_LISTEN)" PROTOCORE_DISCOVERY="$(PROTOCORE_DISCOVERY)" PROTOCORE_REQUIRE_ENROLLMENT="$(PROTOCORE_REQUIRE_ENROLLMENT)" PROTOCORE_ENROLLMENT_FILE="$(PROTOCORE_ENROLLMENT_FILE)" PROTOCORE_EXPECTED_DIGEST_FILE="$(PROTOCORE_EXPECTED_DIGEST_FILE)" PROTOCORE_REQUIRE_TPM_BINDING="$(PROTOCORE_REQUIRE_TPM_BINDING)" PROTOCORE_TPM_QUOTE_FILE="$(PROTOCORE_TPM_QUOTE_FILE)" PROTOCORE_TPM_EVENT_LOG_FILE="$(PROTOCORE_TPM_EVENT_LOG_FILE)" PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="$(PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE)" PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$(PROTOCORE_TPM_SEALED_BLS_SHARE_FILE)" PROTOCORE_KEY_TRANSCRIPT_FILE="$(PROTOCORE_KEY_TRANSCRIPT_FILE)" PROTOCORE_DKG_TRANSCRIPT_FILE="$(PROTOCORE_DKG_TRANSCRIPT_FILE)" ./scripts/build-iso.sh
 
-metal:
+metal: | verify-registry-match
 	env TALOS_VERSION="$(TALOS_VERSION)" ARCH="$(ARCH)" MONO_CORE_DIR="$(MONO_CORE_DIR)" OUT_DIR="$(OUT_DIR)" CHAIN_PROFILE="$(CHAIN_PROFILE)" CHAIN_ID="$(CHAIN_ID)" GENESIS_TOML="$(GENESIS_TOML)" DM_VERITY_EXPECTED_ROOT_HASHES="$(DM_VERITY_EXPECTED_ROOT_HASHES)" PROTOCORE_P2P_LISTEN="$(PROTOCORE_P2P_LISTEN)" PROTOCORE_RPC_LISTEN="$(PROTOCORE_RPC_LISTEN)" PROTOCORE_DISCOVERY="$(PROTOCORE_DISCOVERY)" PROTOCORE_REQUIRE_ENROLLMENT="$(PROTOCORE_REQUIRE_ENROLLMENT)" PROTOCORE_ENROLLMENT_FILE="$(PROTOCORE_ENROLLMENT_FILE)" PROTOCORE_EXPECTED_DIGEST_FILE="$(PROTOCORE_EXPECTED_DIGEST_FILE)" PROTOCORE_REQUIRE_TPM_BINDING="$(PROTOCORE_REQUIRE_TPM_BINDING)" PROTOCORE_TPM_QUOTE_FILE="$(PROTOCORE_TPM_QUOTE_FILE)" PROTOCORE_TPM_EVENT_LOG_FILE="$(PROTOCORE_TPM_EVENT_LOG_FILE)" PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="$(PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE)" PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$(PROTOCORE_TPM_SEALED_BLS_SHARE_FILE)" PROTOCORE_KEY_TRANSCRIPT_FILE="$(PROTOCORE_KEY_TRANSCRIPT_FILE)" PROTOCORE_DKG_TRANSCRIPT_FILE="$(PROTOCORE_DKG_TRANSCRIPT_FILE)" ./scripts/build-metal.sh
 
-extension:
+extension: | verify-registry-match
 	env TALOS_VERSION="$(TALOS_VERSION)" ARCH="$(ARCH)" MONO_CORE_DIR="$(MONO_CORE_DIR)" OUT_DIR="$(OUT_DIR)" CHAIN_PROFILE="$(CHAIN_PROFILE)" CHAIN_ID="$(CHAIN_ID)" GENESIS_TOML="$(GENESIS_TOML)" DM_VERITY_EXPECTED_ROOT_HASHES="$(DM_VERITY_EXPECTED_ROOT_HASHES)" PROTOCORE_P2P_LISTEN="$(PROTOCORE_P2P_LISTEN)" PROTOCORE_RPC_LISTEN="$(PROTOCORE_RPC_LISTEN)" PROTOCORE_DISCOVERY="$(PROTOCORE_DISCOVERY)" PROTOCORE_REQUIRE_ENROLLMENT="$(PROTOCORE_REQUIRE_ENROLLMENT)" PROTOCORE_ENROLLMENT_FILE="$(PROTOCORE_ENROLLMENT_FILE)" PROTOCORE_EXPECTED_DIGEST_FILE="$(PROTOCORE_EXPECTED_DIGEST_FILE)" PROTOCORE_REQUIRE_TPM_BINDING="$(PROTOCORE_REQUIRE_TPM_BINDING)" PROTOCORE_TPM_QUOTE_FILE="$(PROTOCORE_TPM_QUOTE_FILE)" PROTOCORE_TPM_EVENT_LOG_FILE="$(PROTOCORE_TPM_EVENT_LOG_FILE)" PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="$(PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE)" PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$(PROTOCORE_TPM_SEALED_BLS_SHARE_FILE)" PROTOCORE_KEY_TRANSCRIPT_FILE="$(PROTOCORE_KEY_TRANSCRIPT_FILE)" PROTOCORE_DKG_TRANSCRIPT_FILE="$(PROTOCORE_DKG_TRANSCRIPT_FILE)" ./scripts/build-protocore-extension.sh
 
-metadata:
+metadata: | verify-registry-match
 	env TALOS_VERSION="$(TALOS_VERSION)" ARCH="$(ARCH)" MONO_CORE_DIR="$(MONO_CORE_DIR)" OUT_DIR="$(OUT_DIR)" RELEASE_CHANNEL="$(RELEASE_CHANNEL)" CHAIN_PROFILE="$(CHAIN_PROFILE)" CHAIN_ID="$(CHAIN_ID)" GENESIS_TOML="$(GENESIS_TOML)" KERNEL_BASELINE_FILE="$(KERNEL_BASELINE_FILE)" DM_VERITY_EXPECTED_ROOT_HASHES="$(DM_VERITY_EXPECTED_ROOT_HASHES)" PROTOCORE_P2P_LISTEN="$(PROTOCORE_P2P_LISTEN)" PROTOCORE_RPC_LISTEN="$(PROTOCORE_RPC_LISTEN)" PROTOCORE_DISCOVERY="$(PROTOCORE_DISCOVERY)" PROTOCORE_REQUIRE_ENROLLMENT="$(PROTOCORE_REQUIRE_ENROLLMENT)" PROTOCORE_ENROLLMENT_FILE="$(PROTOCORE_ENROLLMENT_FILE)" PROTOCORE_EXPECTED_DIGEST_FILE="$(PROTOCORE_EXPECTED_DIGEST_FILE)" PROTOCORE_REQUIRE_TPM_BINDING="$(PROTOCORE_REQUIRE_TPM_BINDING)" PROTOCORE_TPM_QUOTE_FILE="$(PROTOCORE_TPM_QUOTE_FILE)" PROTOCORE_TPM_EVENT_LOG_FILE="$(PROTOCORE_TPM_EVENT_LOG_FILE)" PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="$(PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE)" PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$(PROTOCORE_TPM_SEALED_BLS_SHARE_FILE)" PROTOCORE_KEY_TRANSCRIPT_FILE="$(PROTOCORE_KEY_TRANSCRIPT_FILE)" PROTOCORE_DKG_TRANSCRIPT_FILE="$(PROTOCORE_DKG_TRANSCRIPT_FILE)" MONARCH_DESKTOP_MIN_VERSION="$(MONARCH_DESKTOP_MIN_VERSION)" MONARCH_DESKTOP_MAX_VERSION="$(MONARCH_DESKTOP_MAX_VERSION)" MONARCH_DESKTOP_CHANNEL="$(MONARCH_DESKTOP_CHANNEL)" UPGRADE_REQUIRES_SAME_CHANNEL="$(UPGRADE_REQUIRES_SAME_CHANNEL)" STATE_MIGRATION_REQUIRED="$(STATE_MIGRATION_REQUIRED)" STATE_MIGRATION_MODE="$(STATE_MIGRATION_MODE)" STATE_MIGRATION_RUNBOOK_ID="$(STATE_MIGRATION_RUNBOOK_ID)" ROLLBACK_SUPPORTED="$(ROLLBACK_SUPPORTED)" ./scripts/write-release-metadata.sh
+
+verify-registry-match:
+	env REGISTRY_NETWORK="$(REGISTRY_NETWORK)" REGISTRY_REF="$(REGISTRY_REF)" GENESIS_TOML="$(GENESIS_TOML)" PROTOCORE_BINARY="$(PROTOCORE_BINARY)" PROTOCORE_TAG="$(PROTOCORE_TAG)" CHAIN_ID="$(CHAIN_ID)" RELEASE_JSON="$(RELEASE_JSON)" REGISTRY_DIR="$(REGISTRY_DIR)" GENESIS_ONLY="$(GENESIS_ONLY)" ./scripts/verify-release-matches-registry.sh
+
+sync-genesis-from-registry:
+	env REGISTRY_NETWORK="$(REGISTRY_NETWORK)" REGISTRY_REF="$(REGISTRY_REF)" GENESIS_TOML="$(GENESIS_TOML)" ./scripts/sync-genesis-from-registry.sh
+
+test-verify-registry-match:
+	./scripts/test-verify-release-matches-registry.sh
 
 dm-verity-root-hashes:
 	env OUT_DIR="$(OUT_DIR)" FORMAT="$(DM_VERITY_ROOT_HASH_FORMAT)" ./scripts/extract-dm-verity-root-hashes.sh "$(DM_VERITY_SUBSTRATE_PROOF)"

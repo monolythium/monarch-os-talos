@@ -154,7 +154,40 @@ jobs:
             exit 1
           fi
           echo "PROTOCORE_BINARY=$PWD/$binary" >> "$GITHUB_ENV"
+          echo "PROTOCORE_TAG=$PROTOCORE_TAG" >> "$GITHUB_ENV"
           echo "PROTOCORE_SOURCE=github.com/monolythium/protocore@$PROTOCORE_TAG/$PROTOCORE_ASSET" >> "$GITHUB_ENV"
+
+      - name: Verify protocore binary + genesis match chain-registry
+        env:
+          CHAIN_PROFILE: ${{ github.event.inputs.chain_profile || 'testnet' }}
+          CHAIN_ID: ${{ github.event.inputs.chain_id || '69420' }}
+          GENESIS_TOML: ${{ github.event.inputs.genesis_toml || 'defaults/testnet/genesis.toml' }}
+          CHAIN_REGISTRY_REF: ${{ vars.CHAIN_REGISTRY_REF || 'master' }}
+        run: |
+          set -euo pipefail
+          # keccak256 cross-check is best-effort; install pycryptodome if we can,
+          # but the guard still proves byte-identity + sha256 without it.
+          python3 -m pip install --quiet --disable-pip-version-check pycryptodome || true
+          # Map the chain_profile build input to its chain-registry network key.
+          case "$CHAIN_PROFILE" in
+            testnet) registry_network="testnet-69420" ;;
+            mainnet)
+              echo "no chain-registry network mapped for chain_profile=mainnet yet" >&2
+              echo "add the mainnet network key (e.g. mainnet-69422) once it is the live source of truth" >&2
+              exit 1
+              ;;
+            *)
+              echo "no chain-registry network mapped for chain_profile=$CHAIN_PROFILE" >&2
+              exit 1
+              ;;
+          esac
+          make verify-registry-match \
+            REGISTRY_NETWORK="$registry_network" \
+            REGISTRY_REF="$CHAIN_REGISTRY_REF" \
+            GENESIS_TOML="$GENESIS_TOML" \
+            PROTOCORE_BINARY="$PROTOCORE_BINARY" \
+            PROTOCORE_TAG="$PROTOCORE_TAG" \
+            CHAIN_ID="$CHAIN_ID"
 
       - name: Build artifacts
         env:
@@ -223,6 +256,43 @@ jobs:
           fi
           make metadata
           make extension-rebuild-witness
+
+      - name: Verify release metadata matches chain-registry
+        env:
+          CHAIN_PROFILE: ${{ github.event.inputs.chain_profile || 'testnet' }}
+          CHAIN_ID: ${{ github.event.inputs.chain_id || '69420' }}
+          GENESIS_TOML: ${{ github.event.inputs.genesis_toml || 'defaults/testnet/genesis.toml' }}
+          CHAIN_REGISTRY_REF: ${{ vars.CHAIN_REGISTRY_REF || 'master' }}
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --disable-pip-version-check pycryptodome || true
+          case "$CHAIN_PROFILE" in
+            testnet) registry_network="testnet-69420" ;;
+            mainnet)
+              echo "no chain-registry network mapped for chain_profile=mainnet yet" >&2
+              exit 1
+              ;;
+            *)
+              echo "no chain-registry network mapped for chain_profile=$CHAIN_PROFILE" >&2
+              exit 1
+              ;;
+          esac
+          # Resolve the generated release.json (templated by Talos version + arch)
+          # without hardcoding the Talos version.
+          shopt -s nullglob
+          release_json=(_out/*.release.json)
+          if [ "${#release_json[@]}" -ne 1 ]; then
+            echo "expected exactly one _out/*.release.json, found ${#release_json[@]}" >&2
+            exit 1
+          fi
+          make verify-registry-match \
+            REGISTRY_NETWORK="$registry_network" \
+            REGISTRY_REF="$CHAIN_REGISTRY_REF" \
+            GENESIS_TOML="$GENESIS_TOML" \
+            PROTOCORE_BINARY="$PROTOCORE_BINARY" \
+            PROTOCORE_TAG="$PROTOCORE_TAG" \
+            CHAIN_ID="$CHAIN_ID" \
+            RELEASE_JSON="${release_json[0]}"
 
       - name: Sign artifacts (cosign keyless)
         if: hashFiles('_out/*.iso') != '' || hashFiles('_out/*.tar') != '' || hashFiles('_out/*.raw.xz') != '' || hashFiles('_out/*.release.json') != '' || hashFiles('_out/*.spdx.json') != '' || hashFiles('_out/*.rebuild-witness.json') != ''
@@ -296,6 +366,9 @@ jobs:
             and .plans.gcp.firewall_rules[2].allowed[0].ports == ["29898"]
             and (.plans.vultr.rules[] | select(.port == "29898" and .ip_type == "v6"))
           ' _out/monarch-cloud-firewall-plan.json >/dev/null
+
+      - name: Verify chain-registry match self-test
+        run: make test-verify-registry-match
 
       - name: Verify upgrade plan generation
         run: make test-upgrade-plan

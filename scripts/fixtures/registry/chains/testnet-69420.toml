@@ -1,0 +1,15 @@
+# Hermetic test fixture — a minimal chain-registry entry mirroring the
+# first-class provenance keys the release-drift guard consumes. Hashes here are
+# computed over the sibling fixture files (chains/genesis/...genesis.toml and
+# bin/protocore) so the self-test PASS case genuinely passes. NOT a real entry.
+chain_id     = 69420
+network      = "testnet-69420"
+display_name = "Fixture Testnet"
+
+genesis_hash = "0xb6383e01ed694c71de754ac3e7800d482f1bf8cd5665ea7af6ef48045ca2a9e9"
+genesis_url  = "https://raw.githubusercontent.com/monolythium/chain-registry/master/chains/genesis/testnet-69420.genesis.toml"
+genesis_sha256 = "25d89f3f4ebaa91cf502bde82fd508c1d21e6973032b83ec269f969591ccf7b3"
+
+release_tag            = "v0.1.51-testnet"
+binary_release_sha256  = "2a4208d37d6a75c2da771a0ef412769f21757f2d74a3d57b6ec88910a728bc98"
+release_tarball_sha256 = "0000000000000000000000000000000000000000000000000000000000000000"

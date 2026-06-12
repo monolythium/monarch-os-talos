@@ -166,6 +166,9 @@ _out/monarch-os-talos-v1.13.0-amd64.iso.spdx.json  # via `make sbom`
 | `make metal` | `_out/*.raw` | Bare-metal raw disk image. |
 | `make extension` | `_out/monarch-protocore-*.tar` | Just the `monarch-protocore` system-extension tarball. |
 | `make metadata` | `_out/*.release.json` | Release metadata: protocore version, mono-core commit, Talos version, arch. |
+| `make verify-registry-match` | pass/fail | Asserts the staged genesis, embedded protocore binary, release tag, and chain id all match the `chain-registry` entry (the source of truth). Order-only prerequisite of `iso`/`metal`/`extension`/`metadata`, so a drifted build cannot start. Set `GENESIS_ONLY=1` to check only the genesis; `REGISTRY_DIR=../chain-registry` for an offline check. |
+| `make sync-genesis-from-registry` | updated `$(GENESIS_TOML)` | Fetches the canonical genesis `chain-registry` pins for `$(REGISTRY_NETWORK)`, verifies its keccak against `genesis_hash`, and copies it into the staged path. This is the one operator action at re-genesis time — it replaces hand-editing the staged genesis. |
+| `make test-verify-registry-match` | self-test report | Runs the hermetic 5-case self-test for the release-drift guard. |
 | `make dm-verity-root-hashes` | root hashes | Extracts validated dm-verity root hashes from configured QEMU substrate proof for `DM_VERITY_EXPECTED_ROOT_HASHES`. |
 | `make extension-rebuild-witness` | `_out/*.rebuild-witness.json` | Rebuilds the extension from release metadata and records the deterministic hash comparison. |
 | `make release-rebuild-witness` | `_out/monarch-os-talos-*.rebuild-witness.json` | Rebuilds ISO/raw/extension/SBOM artifacts from release metadata and records per-artifact hash/size comparisons. |
@@ -357,6 +360,39 @@ which wraps those steps: it generates smoke config, starts this keepalive smoke
 process, passes the release-metadata-derived expected Protocore digest to the
 Tauri app when present, drives the Tauri app, and stops QEMU when the Desktop
 harness exits.
+
+## Release-drift guard
+
+`chain-registry` is the single source of truth for the live chain. Its
+`chains/<network>.toml` entry pins the canonical genesis (`genesis_sha256`,
+`genesis_hash`), the signed protocore release (`release_tag`,
+`binary_release_sha256`), and the `chain_id`. The release-drift guard
+(`scripts/verify-release-matches-registry.sh`) asserts that the staged genesis,
+the embedded protocore binary, the release tag, and the chain id all agree with
+that entry. It is fail-closed: any fetch error, missing pin, or mismatch prints
+a `DRIFT:` line and exits non-zero.
+
+The guard runs in three places, so a drifted image cannot ship:
+
+- **Build** — it is an order-only prerequisite of `iso`, `metal`, `extension`,
+  and `metadata`, so `make` refuses to start a drifted build.
+- **CI** — `.github/workflows/build.yml` runs it on every build (both tag pushes
+  and `workflow_dispatch`), once against the freshly downloaded signed binary +
+  staged genesis and once against the generated `*.release.json`.
+- **Commit** — the optional pre-commit hook checks the staged genesis whenever a
+  commit touches `defaults/*/genesis.toml` or the build workflow. Enable it with:
+
+  ```bash
+  git config core.hooksPath .githooks
+  ```
+
+  The hook runs in `GENESIS_ONLY` offline mode against a sibling
+  `../chain-registry` checkout; if none is present it warns and passes (CI still
+  enforces the full guard).
+
+At re-genesis time the only operator action is `make sync-genesis-from-registry`,
+which pulls the canonical genesis `chain-registry` pins and stages it — no more
+hand-editing the staged genesis.
 
 ## Trust model + verification
 

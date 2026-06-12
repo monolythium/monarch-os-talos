@@ -1,0 +1,8 @@
+# Hermetic test fixture — a small fixed genesis for the release-drift guard
+# self-test. NOT a real genesis. The registry fixture toml pins this file's
+# sha256 (genesis_sha256) and keccak256 (genesis_hash); the guard's PASS case
+# proves byte-identity + sha256 + keccak against these pins.
+chain_id = 69420
+faucet   = "mono1fixturefaucet00000000000000000000000000"
+supply   = "100000000"
+note     = "fixture-genesis-do-not-deploy"

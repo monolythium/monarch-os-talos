@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Release-drift pre-commit guard. When a commit touches the staged genesis
+# (defaults/*/genesis.toml) or the build workflow, verify the staged genesis
+# still matches chain-registry before the change can land. Runs in GENESIS_ONLY
+# mode against a local ../chain-registry checkout (offline) so it needs no
+# network. If no local registry checkout is present, it warns and passes — CI
+# still enforces the full guard on every build.
+#
+# Enable: git config core.hooksPath .githooks
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+cd "$REPO_ROOT"
+
+# Files staged for this commit (added/copied/modified/renamed).
+staged="$(git diff --cached --name-only --diff-filter=ACMR)"
+
+touches_guarded=0
+while IFS= read -r f; do
+  case "$f" in
+    defaults/*/genesis.toml) touches_guarded=1 ;;
+    .github/workflows/build.yml) touches_guarded=1 ;;
+  esac
+done <<EOF
+$staged
+EOF
+
+if [ "$touches_guarded" -eq 0 ]; then
+  exit 0
+fi
+
+REGISTRY_DIR="${REGISTRY_DIR:-../chain-registry}"
+if [ ! -d "$REGISTRY_DIR/chains" ]; then
+  echo "pre-commit: chain-registry checkout not found at $REGISTRY_DIR — skipping" >&2
+  echo "pre-commit: (CI still enforces the release-drift guard on every build)" >&2
+  exit 0
+fi
+
+REGISTRY_NETWORK="${REGISTRY_NETWORK:-testnet-69420}"
+CHAIN_PROFILE="${CHAIN_PROFILE:-testnet}"
+GENESIS_TOML="${GENESIS_TOML:-defaults/$CHAIN_PROFILE/genesis.toml}"
+
+echo "pre-commit: verifying $GENESIS_TOML matches chain-registry ($REGISTRY_NETWORK)" >&2
+REGISTRY_DIR="$REGISTRY_DIR" \
+  REGISTRY_NETWORK="$REGISTRY_NETWORK" \
+  GENESIS_TOML="$GENESIS_TOML" \
+  GENESIS_ONLY=1 \
+  ./scripts/verify-release-matches-registry.sh
