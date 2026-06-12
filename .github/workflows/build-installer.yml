@@ -1,0 +1,106 @@
+name: Build Installer Image
+
+# Builds and publishes the CUSTOM Talos installer image that bakes the protocore
+# system extension, to ghcr.io/monolythium/monarch-os-installer:<tag>. This is
+# what `machine.install.image` must point at so a fresh maintenance-mode install
+# carries `ext-protocore` onto disk (the plain siderolabs installer does not).
+# Independent of the ISO/raw release flow; runs on demand.
+
+on:
+  workflow_dispatch:
+    inputs:
+      protocore_tag:
+        description: "protocore release tag to bake into the extension"
+        required: false
+        default: "v0.1.51-testnet"
+      protocore_asset:
+        description: "protocore linux release asset"
+        required: false
+        default: "protocore-v0.1.51-testnet-x86_64-linux.tar.gz"
+      installer_tag:
+        description: "tag for ghcr.io/monolythium/monarch-os-installer"
+        required: false
+        default: "v0.1.51-testnet"
+      chain_profile:
+        required: false
+        default: "testnet"
+      chain_id:
+        required: false
+        default: "69420"
+      genesis_toml:
+        required: false
+        default: "defaults/testnet/genesis.toml"
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  installer:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Install crane
+        uses: imjasonh/setup-crane@v0.4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download + verify protocore release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PROTOCORE_TAG: ${{ github.event.inputs.protocore_tag }}
+          PROTOCORE_ASSET: ${{ github.event.inputs.protocore_asset }}
+        run: |
+          set -euo pipefail
+          mkdir -p _build/protocore-release _build/protocore-bin
+          gh release download "$PROTOCORE_TAG" \
+            --repo monolythium/protocore \
+            --pattern "$PROTOCORE_ASSET" \
+            --pattern "$PROTOCORE_ASSET.sha256" \
+            --pattern "$PROTOCORE_ASSET.sig" \
+            --pattern "$PROTOCORE_ASSET.pem" \
+            --dir _build/protocore-release
+          (cd _build/protocore-release && sha256sum -c "$PROTOCORE_ASSET.sha256")
+          base64 -d "_build/protocore-release/$PROTOCORE_ASSET.pem" > "_build/protocore-release/$PROTOCORE_ASSET.cert.pem"
+          cosign verify-blob \
+            --certificate "_build/protocore-release/$PROTOCORE_ASSET.cert.pem" \
+            --signature "_build/protocore-release/$PROTOCORE_ASSET.sig" \
+            --certificate-identity-regexp 'https://github.com/monolythium/protocore/.github/workflows/release.yml@refs/tags/.*' \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "_build/protocore-release/$PROTOCORE_ASSET"
+          tar -xzf "_build/protocore-release/$PROTOCORE_ASSET" -C _build/protocore-bin
+          binary="$(find _build/protocore-bin -type f -name protocore -perm -111 | head -n 1)"
+          [ -n "$binary" ] || { echo "no protocore binary in asset" >&2; exit 1; }
+          echo "PROTOCORE_BINARY=$PWD/$binary" >> "$GITHUB_ENV"
+
+      - name: Build protocore extension
+        env:
+          TALOS_VERSION: v1.13.0
+          ARCH: amd64
+          OUT_DIR: _out
+          CHAIN_PROFILE: ${{ github.event.inputs.chain_profile }}
+          CHAIN_ID: ${{ github.event.inputs.chain_id }}
+          GENESIS_TOML: ${{ github.event.inputs.genesis_toml }}
+        run: ./scripts/build-protocore-extension.sh
+
+      - name: Build + push installer image
+        env:
+          TALOS_VERSION: v1.13.0
+          ARCH: amd64
+          OUT_DIR: _out
+          INSTALLER_IMAGE: ghcr.io/monolythium/monarch-os-installer:${{ github.event.inputs.installer_tag }}
+          PUSH_INSTALLER: "true"
+        run: ./scripts/build-installer.sh
+
+      - name: Summary
+        run: echo "Published ghcr.io/monolythium/monarch-os-installer:${{ github.event.inputs.installer_tag }}"
