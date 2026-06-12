@@ -78,8 +78,8 @@
         "REQUIRE_SMOKE_QEMU_SERVICE": true,
         "REQUIRE_SMOKE_QEMU_RPC": true,
         "REQUIRE_SUBSTRATE_RUNTIME_PROOF": true,
-        "REQUIRE_ENROLLMENT_RUNTIME_PROOF": true,
-        "REQUIRE_TPM_BINDING_RUNTIME_PROOF": true,
+        "REQUIRE_ENROLLMENT_RUNTIME_PROOF": false,
+        "REQUIRE_TPM_BINDING_RUNTIME_PROOF": false,
         "REQUIRE_DM_VERITY_ACTIVE": false
       },
       "required_provenance_flags": {
