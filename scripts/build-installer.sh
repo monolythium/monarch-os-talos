@@ -39,6 +39,12 @@ if [[ -z "$EXTENSION_TARBALL" || ! -f "$EXTENSION_TARBALL" ]]; then
 fi
 echo "extension: $EXTENSION_TARBALL"
 
+# NOTE: do NOT set `baseInstaller` here. With a baseInstaller the imager reuses
+# its pre-built UKI and SKIPS the initramfs rebuild — the protocore extension is
+# silently dropped (the installed node ends up with no ext-protocore). Feeding
+# kernel+initramfs (the imager image ships them under /usr/install) makes the
+# imager "rebuild initramfs with system extensions", baking protocore in. This
+# mirrors build-metal.sh exactly, only the output kind differs.
 PROFILE="$OUT_DIR/profile-installer.yaml"
 cat > "$PROFILE" <<EOF_PROFILE
 arch: $ARCH
@@ -46,8 +52,10 @@ platform: metal
 secureboot: false
 version: $TALOS_VERSION
 input:
-  baseInstaller:
-    imageRef: $BASE_INSTALLER
+  kernel:
+    path: /usr/install/$ARCH/vmlinuz
+  initramfs:
+    path: /usr/install/$ARCH/initramfs.xz
   systemExtensions:
     - tarballPath: /extensions/$(basename "$EXTENSION_TARBALL")
 output:
