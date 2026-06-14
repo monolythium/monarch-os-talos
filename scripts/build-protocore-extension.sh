@@ -40,6 +40,38 @@ if [[ "$PROTOCORE_REQUIRE_TPM_BINDING" == "true" ]]; then
   PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-$PROTOCORE_KEY_TRANSCRIPT_FILE}"
 fi
 
+# Cold-start fast-sync seeds. Baked into the service env so a freshly-provisioned
+# OR already-provisioned-then-OTA'd node auto-resolves the quorum-signed
+# checkpoint with no per-node config: the runtime folds these in only when
+# `[fast_sync].seed_rpc_urls` is unset AND the local DB holds only genesis (the
+# bootstrap then verifies every checkpoint against the genesis roster, so an
+# unreachable/wrong seed can only fail to serve, never inject state). Resolved
+# from the chain-registry `[[rpc]]` list at build time. Best-effort: a fetch
+# failure leaves it empty and the runtime falls back to the config-resolved
+# seeds + the historical genesis-forward path — boot is never made worse.
+PROTOCORE_FAST_SYNC_SEED_RPC_URLS="${PROTOCORE_FAST_SYNC_SEED_RPC_URLS:-}"
+if [[ -z "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS" ]]; then
+  case "$CHAIN_PROFILE" in
+    testnet) registry_net="testnet-69420" ;;
+    mainnet) registry_net="mainnet-69422" ;;
+    *)       registry_net="" ;;
+  esac
+  if [[ -n "$registry_net" ]]; then
+    registry_ref="${CHAIN_REGISTRY_REF:-master}"
+    registry_toml_url="https://raw.githubusercontent.com/monolythium/chain-registry/${registry_ref}/chains/${registry_net}.toml"
+    PROTOCORE_FAST_SYNC_SEED_RPC_URLS="$(
+      curl -fsSL --max-time 20 "$registry_toml_url" 2>/dev/null \
+        | awk '/^\[\[rpc\]\]/{in_rpc=1; next} /^\[/{in_rpc=0} in_rpc && /^[[:space:]]*url[[:space:]]*=/{ gsub(/.*=[[:space:]]*"?/,""); gsub(/".*/,""); print }' \
+        | paste -sd, - 2>/dev/null || true
+    )"
+    if [[ -n "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS" ]]; then
+      echo "fast-sync: resolved cold-start seed RPCs from chain-registry ($registry_net): $PROTOCORE_FAST_SYNC_SEED_RPC_URLS"
+    else
+      echo "WARNING: could not resolve fast-sync seeds from chain-registry ($registry_net); fresh-provision config-resolve still applies, OTA'd nodes will not auto-bootstrap" >&2
+    fi
+  fi
+fi
+
 [[ "$OUT_DIR" = /* ]] || OUT_DIR="$ROOT_DIR/$OUT_DIR"
 [[ "$BUILD_DIR" = /* ]] || BUILD_DIR="$ROOT_DIR/$BUILD_DIR"
 [[ "$MONO_CORE_DIR" = /* ]] || MONO_CORE_DIR="$ROOT_DIR/$MONO_CORE_DIR"
@@ -161,6 +193,7 @@ $(if [[ -n "$PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH" ]]; then printf '    - PROTOC
     - PROTOCORE_YES=true
     - PROTOCORE_GENESIS_TOML=./defaults/$CHAIN_PROFILE/genesis.toml
     - PROTOCORE_NAME_REGISTRY_RESERVE_TOML=./defaults/$CHAIN_PROFILE/$RESERVE_BASENAME
+$(if [[ -n "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS" ]]; then printf '    - PROTOCORE_FAST_SYNC_SEED_RPC_URLS=%s\n' "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS"; fi)
   mounts:
     - source: /var/lib/protocore
       destination: /var/lib/protocore
