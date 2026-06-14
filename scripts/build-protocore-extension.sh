@@ -65,7 +65,7 @@ if [[ -z "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS" ]]; then
         | paste -sd, - 2>/dev/null || true
     )"
     if [[ -n "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS" ]]; then
-      echo "fast-sync: resolved cold-start seed RPCs from chain-registry ($registry_net): $PROTOCORE_FAST_SYNC_SEED_RPC_URLS"
+      echo "fast-sync: resolved cold-start seed RPCs from chain-registry ($registry_net): $PROTOCORE_FAST_SYNC_SEED_RPC_URLS" >&2
     else
       echo "WARNING: could not resolve fast-sync seeds from chain-registry ($registry_net); fresh-provision config-resolve still applies, OTA'd nodes will not auto-bootstrap" >&2
     fi
