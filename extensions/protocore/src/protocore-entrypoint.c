@@ -932,9 +932,9 @@ int main(void) {
      * done IN the binary (in-process TLS) — the hardened rootfs has no HTTP
      * client. Only on first boot (genesis.toml absent); a running node's
      * genesis is never re-fetched. */
+    const char *registry_network =
+        env_or_default("PROTOCORE_REGISTRY_NETWORK", "testnet-69420");
     if (access(genesis_path, F_OK) != 0) {
-        const char *registry_network =
-            env_or_default("PROTOCORE_REGISTRY_NETWORK", "testnet-69420");
         char *resolve_argv[] = {
             "./protocore",
             "--home", (char *)home,
@@ -972,6 +972,39 @@ int main(void) {
                 return 1;
             }
         }
+    }
+
+    /* Refresh cold-start fast-sync seeds in config.toml on EVERY boot — not
+     * only first boot. genesis.toml is resolved only on first boot (above), so
+     * an ALREADY-provisioned node that OTAs would otherwise NEVER receive the
+     * chain-registry's [[rpc]] seed list and could not auto-bootstrap (the live
+     * symptom: a node stuck at round 0 in dag-sync because fast-sync never
+     * fired for lack of seeds). Re-run `genesis resolve` pointed at a THROWAWAY
+     * genesis output so the node's real genesis is NEVER touched; only the
+     * [fast_sync] seed RPCs and [p2p] peers in config.toml are refreshed from
+     * the same in-binary-verified registry bytes. Non-fatal: a registry-fetch
+     * failure leaves the existing config seeds in place — boot is never worse. */
+    {
+        char seed_tmp[768];
+        snprintf(seed_tmp, sizeof(seed_tmp), "%s/.fastsync-seed-resolve.tmp",
+                 home);
+        char *seed_argv[] = {
+            "./protocore",
+            "--home", (char *)home,
+            "--network", (char *)network,
+            "--output", "json",
+            "genesis", "resolve",
+            "--registry-network", (char *)registry_network,
+            "--out", seed_tmp,
+            "--write-peers", config_path,
+            NULL,
+        };
+        if (run_and_wait(seed_argv, "protocore fast-sync seed resolve") != 0) {
+            fprintf(stderr,
+                    "WARNING: fast-sync seed resolve failed; using the existing "
+                    "[fast_sync] seeds in config.toml, if any.\n");
+        }
+        unlink(seed_tmp);
     }
 
     /* Seed the name-registry reserve manifest on first boot. On a
