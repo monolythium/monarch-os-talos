@@ -17,6 +17,43 @@ that Monarch OS inherits. Where Monarch OS adds something specific, it is called
 
 ---
 
+## Updating protocore (you do NOT re-flash the ISO)
+
+This is the single most common point of confusion, so it gets stated up front:
+**you never re-flash the ISO to update the protocore node software.** The ISO is a
+one-time installer. After that first install, every protocore upgrade happens
+**in place** — Monarch Desktop's **"Apply"** swaps the node's OS image over the Talos
+API and keeps the entire data partition (`/var/lib/protocore` — chain history and
+keys) untouched.
+
+The confusion usually comes from the version numbers. There are **three separate
+artifacts with three independent version numbers, and they are not meant to match:**
+
+| Artifact | Example version | Version scheme | When an operator touches it |
+|---|---|---|---|
+| **Monarch OS ISO / raw image** (`monarch-os-talos-vX.Y-…iso`) | ISO `vX.Y` (e.g. `v0.1.3`, `v0.1.4`) | Versioned independently of protocore. Bundles a Talos base (`TALOS_VERSION`, currently `v1.13.0`) + a protocore baseline. | **Once**, for the initial install — or for a fresh re-install / a rare Talos-base / OS-level change. **Never for a routine protocore bump.** |
+| **monarch-os-installer container image** (`ghcr.io/monolythium/monarch-os-installer:<tag>`) | matches the protocore release (e.g. `v0.1.56-testnet`, `v0.1.59-testnet`) | Tagged to the protocore release it carries. | Every protocore upgrade — Monarch Desktop "Apply" / re-provision points `machine.install.image` at it, Talos swaps the OS image, data partition is preserved. (Operators don't pull it by hand; Desktop does.) |
+| **protocore release** (`vA.B-testnet`) | protocore `vA.B` (e.g. `v0.1.56-testnet`, `v0.1.59-testnet`) | The node software's own version. | Indirectly — it is baked into the installer image's `ext-protocore` system extension; you move to a new protocore by applying the matching installer image. |
+
+**The ISO version and the protocore version are unrelated — do not try to line them
+up.** An operator who installed from **ISO `v0.1.3`** is completely fine and can update
+protocore to **`v0.1.56`**, then **`v0.1.59`**, entirely in place; they do **not** need a
+newer ISO to do it. You only ever go back to the ISO for a fresh install or a
+Talos-base/OS-level change (rare) — never for a routine protocore version bump.
+
+Monarch Desktop resolves the installer image for updates **dynamically from the latest
+signed protocore GitHub release** — it derives
+`ghcr.io/monolythium/monarch-os-installer:<latest-protocore-tag>` from the newest
+non-draft `monolythium/protocore` release for your channel. So once a new protocore
+release **and** its matching installer image are published, **"Apply" automatically
+targets the newest protocore** — no doc lookup, no re-flash. (Source:
+`monarch-desktop` → `src-tauri/src/release_feed.rs`, `derive_installer_image`.)
+
+The mechanics of that in-place swap — partitions, preserved state, rollback — are in
+[Lifecycle](#lifecycle) below.
+
+---
+
 ## The two layers
 
 A running node is made of two clearly separated layers:
@@ -84,7 +121,10 @@ under **`/var/lib/protocore`** (see [extensions/protocore](../extensions/protoco
 
 ### 3. Upgrade (new image, same data)
 
-Upgrades **do not** mean re-flashing the ISO. When a new signed OS image is released,
+Upgrades **do not** mean re-flashing the ISO (see
+[Updating protocore](#updating-protocore-you-do-not-re-flash-the-iso) above for why
+the ISO version and the protocore version are independent). When a new signed OS image
+is released,
 the operator first verifies the target artifact and compares the current and target
 release metadata:
 
@@ -300,7 +340,12 @@ will be published when the first non-preview signed release ships.
 ## Glossary
 
 - **ISO** — a single bootable disk-image file. Here it is used only as an installer; it
-  is not where the node runs from long-term.
+  is not where the node runs from long-term. Its version (`vX.Y`) is independent of the
+  protocore version — you do not re-flash it to update protocore (see
+  [Updating protocore](#updating-protocore-you-do-not-re-flash-the-iso)).
+- **monarch-os-installer image** — the `ghcr.io/monolythium/monarch-os-installer:<tag>`
+  Talos installer image used for **in-place** protocore upgrades; its tag matches the
+  protocore release, and Monarch Desktop "Apply" points `machine.install.image` at it.
 - **Talos Linux** — the immutable, API-managed Linux distribution Monarch OS is built
   on. No shell, no SSH, no package manager; everything is done over an API with
   `talosctl`.

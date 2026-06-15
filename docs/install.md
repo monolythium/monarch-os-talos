@@ -7,6 +7,14 @@ Monarch OS is an immutable, signed Talos-based OS that boots straight into a Mon
 > - `monarch-os-talos-<ver>-amd64.raw.xz` — compressed raw disk image (cloud import).
 > - each with `.sha256`, a cosign `.sig` + `.pem`, and an SPDX SBOM.
 
+> **The ISO is a one-time installer — you do not re-flash it to update protocore.** The
+> ISO version (`vX.Y`) and the protocore version (`vA.B-testnet`) are independent and are
+> not meant to match. You flash/boot the ISO **once** to install the node onto its disk;
+> after that, **all protocore upgrades happen in place** — Monarch Desktop's "Apply" swaps
+> the OS image and preserves your chain data at `/var/lib/protocore`. A node installed from
+> an older ISO updates to the newest protocore without a newer ISO. The full three-artifact
+> model is in [`upgrade-and-storage.md` → Updating protocore](./upgrade-and-storage.md#updating-protocore-you-do-not-re-flash-the-iso).
+
 ---
 
 ## 0. Pick your substrate (and know the trust posture)
