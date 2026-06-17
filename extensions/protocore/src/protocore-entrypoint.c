@@ -431,6 +431,7 @@ static int verify_provisioning_policy(int operator_enabled, int first_boot, cons
         "PROTOCORE_EXPECTED_DIGEST_FILE",
         "PROTOCORE_ENROLLMENT_FILE",
         "PROTOCORE_KEYSTORE_PASSPHRASE_FILE",
+        "PROTOCORE_OPERATOR_MNEMONIC_FILE",
         "PROTOCORE_NODE_MODE",
         "PROTOCORE_START_NODE_MODE",
         "PROTOCORE_NO_OPERATOR",
@@ -756,7 +757,68 @@ static int lythiumseal_operator_key_exists(const char *home) {
     return access(sealed_path, F_OK) == 0 || access(plaintext_path, F_OK) == 0;
 }
 
-static int run_operator_keygen(const char *home, const char *network, const char *passphrase_path) {
+/* Resolve the seat-recovery mnemonic file path. On a "Re-provision with
+ * existing keys" boot the Monarch desktop stages the operator's BIP-39
+ * mnemonic at <home>/recovery/operator-mnemonic.txt (mode 0600, via the
+ * machine.files config that survives the EPHEMERAL wipe). The path may be
+ * overridden with PROTOCORE_OPERATOR_MNEMONIC_FILE (a FILE PATH — allowed;
+ * the inline PROTOCORE_OPERATOR_MNEMONIC env stays rejected by
+ * reject_inline_secret_envs). Returns 1 and fills `out` when a readable file
+ * is present, 0 otherwise. */
+static int recovery_mnemonic_file(const char *home, char *out, size_t out_len) {
+    const char *env_path = getenv("PROTOCORE_OPERATOR_MNEMONIC_FILE");
+
+    if (env_path && env_path[0]) {
+        if (snprintf(out, out_len, "%s", env_path) >= (int)out_len) {
+            return 0;
+        }
+    } else if (snprintf(out, out_len, "%s/recovery/operator-mnemonic.txt", home) >=
+               (int)out_len) {
+        return 0;
+    }
+
+    if (access(out, R_OK) != 0) {
+        return 0;
+    }
+    return 1;
+}
+
+/* Securely delete the recovery mnemonic file: overwrite its bytes with zeros
+ * (best effort, flushed to disk) and unlink it. Called after first-boot
+ * keygen on BOTH the success and failure paths so the plaintext seed phrase
+ * never lingers on the STATE partition. */
+static void secure_delete_file(const char *path) {
+    struct stat st;
+
+    int fd = open(path, O_WRONLY);
+    if (fd >= 0) {
+        if (fstat(fd, &st) == 0 && st.st_size > 0) {
+            unsigned char zeros[4096];
+            memset(zeros, 0, sizeof(zeros));
+            off_t remaining = st.st_size;
+            while (remaining > 0) {
+                size_t chunk = remaining < (off_t)sizeof(zeros)
+                                   ? (size_t)remaining
+                                   : sizeof(zeros);
+                ssize_t written = write(fd, zeros, chunk);
+                if (written <= 0) {
+                    break;
+                }
+                remaining -= written;
+            }
+            fsync(fd);
+        }
+        close(fd);
+    }
+
+    if (unlink(path) != 0 && errno != ENOENT) {
+        perror("unlink recovery mnemonic file");
+    }
+}
+
+static int run_operator_keygen(const char *home, const char *network,
+                               const char *passphrase_path,
+                               const char *mnemonic_file) {
     char passphrase[4096];
 
     if (read_file_trimmed(passphrase_path, passphrase, sizeof(passphrase),
@@ -775,15 +837,27 @@ static int run_operator_keygen(const char *home, const char *network, const char
     }
     wipe_bytes(passphrase, sizeof(passphrase));
 
-    char *keygen_argv[] = {
-        "./protocore",
-        "--home", (char *)home,
-        "--network", (char *)network,
-        "--output", "json",
-        "--yes",
-        "registry", "gen-operator-keys",
-        NULL,
-    };
+    char *keygen_argv[12];
+    size_t kidx = 0;
+    keygen_argv[kidx++] = "./protocore";
+    keygen_argv[kidx++] = "--home";
+    keygen_argv[kidx++] = (char *)home;
+    keygen_argv[kidx++] = "--network";
+    keygen_argv[kidx++] = (char *)network;
+    keygen_argv[kidx++] = "--output";
+    keygen_argv[kidx++] = "json";
+    keygen_argv[kidx++] = "--yes";
+    keygen_argv[kidx++] = "registry";
+    keygen_argv[kidx++] = "gen-operator-keys";
+    if (mnemonic_file && mnemonic_file[0]) {
+        /* Seat-recovery boot: re-derive the SAME ML-DSA-65 consensus key from
+         * the operator's BIP-39 mnemonic instead of minting a fresh random one
+         * (which would orphan the bonded seat). */
+        keygen_argv[kidx++] = "--from-mnemonic";
+        keygen_argv[kidx++] = (char *)mnemonic_file;
+    }
+    keygen_argv[kidx] = NULL;
+
     int rc = run_and_wait(keygen_argv, "protocore registry gen-operator-keys");
     unsetenv("PROTOCORE_KEYSTORE_PASSPHRASE");
     return rc;
@@ -910,8 +984,25 @@ int main(void) {
             if (operator_consensus_key_exists(home)) {
                 fprintf(stderr,
                         "operator consensus key already present; preserving existing identity\n");
-            } else if (run_operator_keygen(home, network, passphrase_path) != 0) {
-                return 1;
+            } else {
+                /* Seat-recovery: an EPHEMERAL wipe removed consensus.key.enc,
+                 * so keygen runs here. If the Monarch desktop staged a recovery
+                 * mnemonic, re-derive the SAME key from it (preserving the
+                 * bonded seat); otherwise mint a fresh random key. The mnemonic
+                 * file is securely deleted afterward on BOTH paths so the
+                 * plaintext seed phrase never lingers on STATE. */
+                char mnemonic_path[768];
+                int have_mnemonic =
+                    recovery_mnemonic_file(home, mnemonic_path, sizeof(mnemonic_path));
+                int keygen_rc = run_operator_keygen(
+                    home, network, passphrase_path,
+                    have_mnemonic ? mnemonic_path : NULL);
+                if (have_mnemonic) {
+                    secure_delete_file(mnemonic_path);
+                }
+                if (keygen_rc != 0) {
+                    return 1;
+                }
             }
             if (lythiumseal_operator_key_exists(home)) {
                 fprintf(stderr,
