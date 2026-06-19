@@ -12,15 +12,15 @@ on:
       protocore_tag:
         description: "protocore release tag to bake into the extension"
         required: false
-        default: "v0.1.51-testnet"
+        default: "v0.1.70-testnet"
       protocore_asset:
         description: "protocore linux release asset"
         required: false
-        default: "protocore-v0.1.51-testnet-x86_64-linux.tar.gz"
+        default: "protocore-v0.1.70-testnet-x86_64-linux.tar.gz"
       installer_tag:
         description: "tag for ghcr.io/monolythium/monarch-os-installer"
         required: false
-        default: "v0.1.51-testnet"
+        default: "v0.1.70-testnet"
       chain_profile:
         required: false
         default: "testnet"

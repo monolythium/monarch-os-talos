@@ -17,7 +17,7 @@
 #   IMAGER_IMAGE    (default ghcr.io/siderolabs/imager:$TALOS_VERSION)
 #   BASE_INSTALLER  (default ghcr.io/siderolabs/installer:$TALOS_VERSION)
 #   INSTALLER_IMAGE (required) target ref, e.g.
-#                   ghcr.io/monolythium/monarch-os-installer:v0.1.51-testnet
+#                   ghcr.io/monolythium/monarch-os-installer:v0.1.70-testnet
 #   PUSH_INSTALLER  (default false) — `true` to `crane push` the result
 set -euo pipefail
 

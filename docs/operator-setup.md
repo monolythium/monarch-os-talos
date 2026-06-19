@@ -22,7 +22,7 @@ The path is: **verify and boot the signed Monarch OS image (boots into Talos mai
 
 ## 1. Download and verify the signed image
 
-Releases ship from [**github.com/monolythium/monarch-os-talos/releases**](https://github.com/monolythium/monarch-os-talos/releases). `v0.1.3` is the current signed release: it bakes the signed `protocore v0.1.51-testnet` node binary, boots **enrollment-free**, resolves the live genesis from the chain-registry, and syncs as a full node. Every artifact carries a SHA-256 checksum, a cosign keyless signature (`.sig` + `.pem`), an SPDX SBOM, and a GitHub artifact attestation.
+Releases ship from [**github.com/monolythium/monarch-os-talos/releases**](https://github.com/monolythium/monarch-os-talos/releases). `v0.1.3` is the current signed release: it bakes the signed `protocore v0.1.70-testnet` node binary, boots **enrollment-free**, resolves the live genesis from the chain-registry, and syncs as a full node. Every artifact carries a SHA-256 checksum, a cosign keyless signature (`.sig` + `.pem`), an SPDX SBOM, and a GitHub artifact attestation.
 
 Verify before you flash — every substrate, every time. Requires [`cosign`](https://github.com/sigstore/cosign) and the [`gh`](https://cli.github.com/) CLI:
 
@@ -54,7 +54,7 @@ cosign verify-blob \
 
 The same four steps verify the `.raw.xz` (swap `$ISO` for `$RAW`) and the `monarch-protocore-*.tar` extension tarball. The compressed `.raw.xz` is signed directly — verify it **before** decompressing. The embedded `protocore` binary is itself cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protocore); the `*.release.json` metadata pins the exact binary digest and source commit the image was built from.
 
-> **ISO version vs protocore version — they are different on purpose.** The ISO here is `v0.1.3`; it bakes `protocore v0.1.51-testnet`. **These two numbers are not meant to match, and you never re-flash the ISO to update protocore.** The ISO is a one-time installer; after the install, all protocore upgrades happen **in place** via Monarch Desktop's "Apply" (which swaps the OS image and keeps your chain data). An operator who installed from an older ISO updates protocore to the latest release without a newer ISO. Full model — the three artifacts and their independent version schemes — is in [`upgrade-and-storage.md` → Updating protocore](./upgrade-and-storage.md#updating-protocore-you-do-not-re-flash-the-iso).
+> **ISO version vs protocore version — they are different on purpose.** The ISO here is `v0.1.3`; it bakes `protocore v0.1.70-testnet`. **These two numbers are not meant to match, and you never re-flash the ISO to update protocore.** The ISO is a one-time installer; after the install, all protocore upgrades happen **in place** via Monarch Desktop's "Apply" (which swaps the OS image and keeps your chain data). An operator who installed from an older ISO updates protocore to the latest release without a newer ISO. Full model — the three artifacts and their independent version schemes — is in [`upgrade-and-storage.md` → Updating protocore](./upgrade-and-storage.md#updating-protocore-you-do-not-re-flash-the-iso).
 
 ## 2. Flash and boot
 
