@@ -44,7 +44,7 @@ chain_id = 69420
 # Config id/version for this milestone set. Bump on every edit so operators and
 # tooling can refer to a specific revision of the rolling config. (Replaces the
 # dropped signer_set_id; carries no signing semantics.)
-config_id = "testnet-58-wallclock"
+config_id = "testnet-58-wallclock-h83000"
 
 [[entries]]
 id = "testnet-bringup-unlock"
@@ -128,16 +128,17 @@ address = "0x000000000000000000000000000000000000110e"
 enabled = true
 
 # --- Rolling upgrade: F-INF-047 / issue #58 -------------------------------
-# Byzantine block.timestamp wall-clock clamp. Activates at height 200000 — a
-# multi-day buffer above the ~44.3k live height at authoring — so the fleet can
-# roll this config one node at a time, well before activation. Below 200000
-# every node folds this entry as None (rule OFF, legacy timestamp formula) and
-# is byte-identical to the pre-edit baseline; at height >= 200000 every node
-# enforces the deterministic round-anchored timestamp window (rejecting any
-# proposer, honest or Byzantine, outside [floor, floor + 1h]). Field value ==
-# height per the in-tree activation contract:
+# Byzantine block.timestamp wall-clock clamp. Re-targeted to height 83000 — a
+# ~4h buffer above the ~76.4k live height at this revision (was 200000), to
+# bring the clamp into force sooner now that the rolling-config mechanism is
+# proven. The fleet rolls this config one node at a time, well before
+# activation. Below 83000 every node folds this entry as None (rule OFF, legacy
+# timestamp formula) and is byte-identical to the pre-edit baseline; at height
+# >= 83000 every node enforces the deterministic round-anchored timestamp
+# window (rejecting any proposer, honest or Byzantine, outside [floor,
+# floor + 1h]). Field value == height per the in-tree activation contract:
 #   effective_at(h).block_timestamp_wall_clock_height.is_some_and(|a| h >= a)
 [[entries]]
 id = "activate-58-block-timestamp-wallclock"
-height = 200000
-block_timestamp_wall_clock_height = 200000
+height = 83000
+block_timestamp_wall_clock_height = 83000
