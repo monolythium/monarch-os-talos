@@ -667,7 +667,8 @@ static int write_first_boot_config(const char *path, const char *passphrase_file
             "mode = \"%s\"\n\n"
             "[consensus]\n"
             "chain_id = %s\n"
-            "round_duration_ms = 3000\n\n"
+            "round_duration_ms = 3000\n"
+            "milestones_path = \"milestones.toml\"\n\n"
             "[p2p]\n"
             "listen = ",
             operator_enabled ? "operator" : "full",
@@ -911,6 +912,8 @@ int main(void) {
     const char *home = env_or_default("PROTOCORE_HOME", "/var/lib/protocore");
     const char *network = env_or_default("PROTOCORE_NETWORK", "testnet");
     const char *genesis = env_or_default("PROTOCORE_GENESIS_TOML", "./defaults/testnet/genesis.toml");
+    const char *milestones = env_or_default("PROTOCORE_MILESTONES_TOML",
+                                            "./defaults/testnet/milestones.toml");
     const char *reserve = env_or_default("PROTOCORE_NAME_REGISTRY_RESERVE_TOML",
                                          "./defaults/testnet/name-registry-reserve-testnet.toml");
     char config_path[640];
@@ -1096,6 +1099,30 @@ int main(void) {
                     "[fast_sync] seeds in config.toml, if any.\n");
         }
         unlink(seed_tmp);
+    }
+
+    /* Seed the milestone config on first boot. The genesis.toml embeds none of
+     * the chain's height-keyed effective-params (binary_state_tree_active_height,
+     * epoch_seed_*, delegation_settle_fix_height, fee splits, precompile gates) —
+     * those live ONLY in the milestone config, which config.toml references via
+     * consensus.milestones_path = "milestones.toml" (resolved against <home>).
+     * Without it a fresh node falls back to compiled defaults and FORKS at
+     * height 1, so the baked milestones must travel with the image exactly like
+     * the genesis + name-registry reserve. Only if absent — a running node's
+     * milestones are never overwritten. */
+    char home_milestones[640];
+    snprintf(home_milestones, sizeof(home_milestones), "%s/milestones.toml", home);
+    if (access(home_milestones, F_OK) != 0) {
+        if (access(milestones, R_OK) != 0) {
+            fprintf(stderr,
+                    "FATAL: no baked milestone config at %s; the node would fork "
+                    "at height 1 without the chain's effective-params\n",
+                    milestones);
+            return 1;
+        }
+        if (copy_file(milestones, home_milestones) != 0) {
+            return 1;
+        }
     }
 
     /* Seed the name-registry reserve manifest on first boot. On a

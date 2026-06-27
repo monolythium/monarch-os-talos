@@ -1,0 +1,143 @@
+# Monolythium Testnet (chain-69420) — canonical milestone config
+#
+# THIS IS THE CANONICAL, UNSIGNED milestone configuration for testnet-69420.
+# It is plain config: a [meta] header (chain id + a config id/version) and one
+# or more [[entries]], each activating a set of protocol parameters / precompile
+# gates at a given block height. The chain loads this file as configuration; it
+# does NOT verify any in-file milestone signature. The dropped on-chain signature
+# apparatus ([meta].signers / threshold / signer_set_id and the [[signatures]]
+# blocks) is intentionally absent here.
+#
+# AUTHENTICITY (supply-chain, not on-chain):
+#   Authenticity of this file is provided by the cosign signature committed
+#   beside it — `testnet-69420.milestones.toml.sig` + `.pem` (and `.sha256`),
+#   produced by the `.github/workflows/milestones-attestation.yml` keyless-OIDC
+#   cosign CI. Operators MUST verify before deploy, e.g.:
+#
+#     cosign verify-blob \
+#       --certificate      testnet-69420.milestones.toml.pem \
+#       --signature        testnet-69420.milestones.toml.sig \
+#       --certificate-identity-regexp \
+#         'https://github.com/monolythium/chain-registry/\.github/workflows/milestones-attestation\.yml@.*' \
+#       --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+#       testnet-69420.milestones.toml
+#
+#   This is exactly the same GitHub-authenticity model the registry already uses
+#   for `genesis_url` (the committed genesis content) and for the cosigned
+#   protocore release the operator binary is built from.
+#
+# ON-CHAIN BINDING:
+#   The genesis bundle pins this config's canonical `milestone_digest`. A node
+#   loading these milestones recomputes that digest and requires it to match the
+#   genesis pin before applying any entry, so the content a node runs is bound to
+#   the genesis it booted — the digest is the on-chain anchor, the cosign blob is
+#   the supply-chain anchor, and there is no in-file signature to verify.
+#
+# ROLLING UPGRADE:
+#   To change protocol parameters without a re-genesis: append/edit an [[entries]]
+#   block with a future activation `height`, push to master (CI re-cosigns), then
+#   operators `cosign verify-blob` the new file, deploy it, and roll the fleet
+#   BEFORE the new activation height. See README.md "Milestones".
+
+[meta]
+chain_id = 69420
+# Config id/version for this milestone set. Bump on every edit so operators and
+# tooling can refer to a specific revision of the rolling config. (Replaces the
+# dropped signer_set_id; carries no signing semantics.)
+config_id = "testnet-58-wallclock"
+
+[[entries]]
+id = "testnet-bringup-unlock"
+height = 0
+inflation_ceiling_bps = 800
+delegation_cap_bps = 4294967295
+mrv_app_contract_parity_height = 1
+delegation_settle_fix_height = 1
+epoch_seed_round_keyed_height = 1
+epoch_seed_from_state_root_height = 1
+binary_state_tree_active_height = 1
+fee_burn_bps = 5000
+fee_operator_bps = 3000
+fee_treasury_bps = 2000
+per_operator_cluster_cap = 3
+delegation_cap_per_wallet_bps = 5000
+cloud_operator_cap_bps = 4294967295
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001001"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001004"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x000000000000000000000000000000000000100a"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x000000000000000000000000000000000000100b"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001102"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001104"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001105"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001106"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001107"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001108"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x0000000000000000000000000000000000001109"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x000000000000000000000000000000000000110a"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x000000000000000000000000000000000000110b"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x000000000000000000000000000000000000110c"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x000000000000000000000000000000000000110d"
+enabled = true
+
+[[entries.precompile_gates]]
+address = "0x000000000000000000000000000000000000110e"
+enabled = true
+
+# --- Rolling upgrade: F-INF-047 / issue #58 -------------------------------
+# Byzantine block.timestamp wall-clock clamp. Activates at height 200000 — a
+# multi-day buffer above the ~44.3k live height at authoring — so the fleet can
+# roll this config one node at a time, well before activation. Below 200000
+# every node folds this entry as None (rule OFF, legacy timestamp formula) and
+# is byte-identical to the pre-edit baseline; at height >= 200000 every node
+# enforces the deterministic round-anchored timestamp window (rejecting any
+# proposer, honest or Byzantine, outside [floor, floor + 1h]). Field value ==
+# height per the in-tree activation contract:
+#   effective_at(h).block_timestamp_wall_clock_height.is_some_and(|a| h >= a)
+[[entries]]
+id = "activate-58-block-timestamp-wallclock"
+height = 200000
+block_timestamp_wall_clock_height = 200000

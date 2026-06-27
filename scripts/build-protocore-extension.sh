@@ -12,6 +12,7 @@ PROTOCORE_CARGO_FEATURES="${PROTOCORE_CARGO_FEATURES:-mdbx,indexer-postgres}"
 CHAIN_PROFILE="${CHAIN_PROFILE:-testnet}"
 CHAIN_ID="${CHAIN_ID:-69420}"
 GENESIS_TOML="${GENESIS_TOML:-"$ROOT_DIR/defaults/$CHAIN_PROFILE/genesis.toml"}"
+MILESTONES_TOML="${MILESTONES_TOML:-"$ROOT_DIR/defaults/$CHAIN_PROFILE/milestones.toml"}"
 NAME_REGISTRY_RESERVE_TOML="${NAME_REGISTRY_RESERVE_TOML:-"$ROOT_DIR/defaults/$CHAIN_PROFILE/name-registry-reserve-$CHAIN_PROFILE.toml"}"
 PROTOCORE_P2P_LISTEN="${PROTOCORE_P2P_LISTEN:-/ip4/0.0.0.0/tcp/29898}"
 PROTOCORE_RPC_LISTEN="${PROTOCORE_RPC_LISTEN:-0.0.0.0:8545}"
@@ -79,6 +80,9 @@ fi
 if [[ -n "$GENESIS_TOML" && "$GENESIS_TOML" != /* ]]; then
   GENESIS_TOML="$ROOT_DIR/$GENESIS_TOML"
 fi
+if [[ -n "$MILESTONES_TOML" && "$MILESTONES_TOML" != /* ]]; then
+  MILESTONES_TOML="$ROOT_DIR/$MILESTONES_TOML"
+fi
 if [[ -n "$NAME_REGISTRY_RESERVE_TOML" && "$NAME_REGISTRY_RESERVE_TOML" != /* ]]; then
   NAME_REGISTRY_RESERVE_TOML="$ROOT_DIR/$NAME_REGISTRY_RESERVE_TOML"
 fi
@@ -128,6 +132,22 @@ gcc -static -Os -s -o "$SERVICE_ROOT/protocore-entrypoint" "$ROOT_DIR/extensions
 if [[ -n "$GENESIS_TOML" && -f "$GENESIS_TOML" ]]; then
   mkdir -p "$SERVICE_ROOT/defaults/$CHAIN_PROFILE"
   cp "$GENESIS_TOML" "$SERVICE_ROOT/defaults/$CHAIN_PROFILE/genesis.toml"
+fi
+
+# Bake the milestone config. The genesis.toml embeds none of the chain's
+# height-keyed effective-params (binary_state_tree_active_height, epoch_seed_*,
+# delegation_settle_fix_height, fee splits, precompile gates) — those live ONLY
+# in the milestone config. Without it a fresh node falls back to compiled
+# defaults and FORKS at height 1, so the milestones MUST travel with the image
+# exactly like the baked genesis + name-registry reserve. The entrypoint seeds
+# it into <home>/milestones.toml on first boot and points
+# consensus.milestones_path at it.
+if [[ -n "$MILESTONES_TOML" && -f "$MILESTONES_TOML" ]]; then
+  mkdir -p "$SERVICE_ROOT/defaults/$CHAIN_PROFILE"
+  cp "$MILESTONES_TOML" "$SERVICE_ROOT/defaults/$CHAIN_PROFILE/milestones.toml"
+else
+  echo "milestone config not found at $MILESTONES_TOML; nodes would fork at height 1 without the chain's effective-params" >&2
+  exit 1
 fi
 
 # Bake the name-registry reserve manifest. On a public-profile chain the node
@@ -192,6 +212,7 @@ $(if [[ -n "$PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH" ]]; then printf '    - PROTOC
     - PROTOCORE_OUTPUT=json
     - PROTOCORE_YES=true
     - PROTOCORE_GENESIS_TOML=./defaults/$CHAIN_PROFILE/genesis.toml
+    - PROTOCORE_MILESTONES_TOML=./defaults/$CHAIN_PROFILE/milestones.toml
     - PROTOCORE_NAME_REGISTRY_RESERVE_TOML=./defaults/$CHAIN_PROFILE/$RESERVE_BASENAME
 $(if [[ -n "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS" ]]; then printf '    - PROTOCORE_FAST_SYNC_SEED_RPC_URLS=%s\n' "$PROTOCORE_FAST_SYNC_SEED_RPC_URLS"; fi)
   mounts:
