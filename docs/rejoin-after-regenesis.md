@@ -6,9 +6,9 @@ re-genesis, it is stuck on an **abandoned** chain: the old committee no longer
 produces blocks, so your node sits at a frozen height, fails to find peers, or
 quarantines. This guide gets you back onto the current chain.
 
-> **Current chain (2026-06-20):** genesis
-> `0xd56f9763ca849c5482cae27c7e2551f891684063b89afd53aadeb55868453959`,
-> release **`protocore v0.2.0-testnet`** (mono-core `76803f49`). The
+> **Current chain (2026-06-25):** genesis
+> `0xb52b59d667a0ad97c531607b840b7082547ba3151aa11a819eb6916b080b1ca9`,
+> release **`protocore v0.2.2-testnet`** (mono-core `6f33aa30`). The
 > authoritative pin is always
 > [chain-registry / `chains/testnet-69420.toml`](https://github.com/monolythium/chain-registry/blob/master/chains/testnet-69420.toml)
 > (`genesis_hash`, `release_tag`, `binary_sha`). Do not hard-code the values
@@ -123,7 +123,7 @@ curl -s http://127.0.0.1:8545 -H 'content-type: application/json' \
 ```
 
 Cross-check your genesis hash equals the registry's `genesis_hash`
-(`0xd56f9763…`) and your height tracks [monoscan.io](https://monoscan.io). Once
+(`0xb52b…`) and your height tracks [monoscan.io](https://monoscan.io). Once
 `state` is `synced` with `lag` ~0 you're rejoined. A committee operator should
 also confirm its seat is active again (the seat carries over because the key was
 re-derived from your mnemonic).
