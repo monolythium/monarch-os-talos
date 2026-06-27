@@ -22,7 +22,7 @@ The path is: **verify and boot the signed Monarch OS image (boots into Talos mai
 
 ## 1. Download and verify the signed image
 
-Releases ship from [**github.com/monolythium/monarch-os-talos/releases**](https://github.com/monolythium/monarch-os-talos/releases). `v0.1.7` is the current signed release: it bakes the signed `protocore v0.2.0-testnet` node binary, boots **enrollment-free**, resolves the live genesis from the chain-registry, and syncs as a full node. Every artifact carries a SHA-256 checksum, a cosign keyless signature (`.sig` + `.pem`), an SPDX SBOM, and a GitHub artifact attestation.
+Releases ship from [**github.com/monolythium/monarch-os-talos/releases**](https://github.com/monolythium/monarch-os-talos/releases). `v0.1.7` is the current signed release: it bakes the signed `protocore v0.2.2-testnet` node binary, boots **enrollment-free**, resolves the live genesis from the chain-registry, and syncs as a full node. Every artifact carries a SHA-256 checksum, a cosign keyless signature (`.sig` + `.pem`), an SPDX SBOM, and a GitHub artifact attestation.
 
 Verify before you flash — every substrate, every time. Requires [`cosign`](https://github.com/sigstore/cosign) and the [`gh`](https://cli.github.com/) CLI:
 
@@ -54,7 +54,7 @@ cosign verify-blob \
 
 The same four steps verify the `.raw.xz` (swap `$ISO` for `$RAW`) and the `monarch-protocore-*.tar` extension tarball. The compressed `.raw.xz` is signed directly — verify it **before** decompressing. The embedded `protocore` binary is itself cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protocore); the `*.release.json` metadata pins the exact binary digest and source commit the image was built from.
 
-> **ISO version vs protocore version — they are different on purpose.** The ISO here is `v0.1.7`; it bakes `protocore v0.2.0-testnet`. **These two numbers are not meant to match, and you never re-flash the ISO to update protocore.** The ISO is a one-time installer; after the install, all protocore upgrades happen **in place** via Monarch Desktop's "Apply" (which swaps the OS image and keeps your chain data). An operator who installed from an older ISO updates protocore to the latest release without a newer ISO. Full model — the three artifacts and their independent version schemes — is in [`upgrade-and-storage.md` → Updating protocore](./upgrade-and-storage.md#updating-protocore-you-do-not-re-flash-the-iso).
+> **ISO version vs protocore version — they are different on purpose.** The ISO here is `v0.1.7`; it bakes `protocore v0.2.2-testnet`. **These two numbers are not meant to match, and you never re-flash the ISO to update protocore.** The ISO is a one-time installer; after the install, all protocore upgrades happen **in place** via Monarch Desktop's "Apply" (which swaps the OS image and keeps your chain data). An operator who installed from an older ISO updates protocore to the latest release without a newer ISO. Full model — the three artifacts and their independent version schemes — is in [`upgrade-and-storage.md` → Updating protocore](./upgrade-and-storage.md#updating-protocore-you-do-not-re-flash-the-iso).
 
 ## 2. Flash and boot
 
@@ -108,7 +108,7 @@ Check that `genesisHash` and `chainId` match the chain-registry entry and that t
 
 Syncing a full node (above) is the default and needs nothing more. **Operator-signing enrollment and TPM binding are opt-in:** this section is the explicit upgrade from a plain sync-full node to one that holds a signing seat. Skip it entirely if you only want to run a relay/full node.
 
-Desktop opens the **welcome screen**: a ten-step checklist whose state is **detected from your node and the chain, not remembered** — you can close the app at any point and resume later; done steps stay done because they are re-probed, not ticked. The checklist is the authoritative flow; the items below explain what each step does so you know what you're agreeing to.
+Desktop opens the **welcome screen**: a nine-step checklist whose state is **detected from your node and the chain, not remembered** — you can close the app at any point and resume later; done steps stay done because they are re-probed, not ticked. The checklist is the authoritative flow; the items below explain what each step does so you know what you're agreeing to.
 
 1. **Flash and provision the Monarch OS node.** Sections 1–3 of this guide. The checklist links the signed releases page; the step shows done once your in-app-provisioned node is reachable and syncing.
 
@@ -122,13 +122,11 @@ Desktop opens the **welcome screen**: a ten-step checklist whose state is **dete
 
 6. **Set your operator name.** Publishes a human-readable moniker so other operators recognise your node in directories, chat, and the ceremony room.
 
-7. **Publish your seal key.** Puts your node's public seal key (the ML-KEM encapsulation key generated at first boot) on-chain. Required before a cluster can admit you into sealed-mempool duty.
+7. **Publish your chat peers.** Publishes your node's chat bootstrap multiaddrs on-chain so other operators can reach you in the signed operator chat. This is also the meshing precondition for the cluster **ceremony room**.
 
-8. **Publish your chat peers.** Publishes your node's chat bootstrap multiaddrs on-chain so other operators can reach you in the signed operator chat. This is also the meshing precondition for the cluster **ceremony room**.
+8. **Join or form a cluster.** The fork in the road — see the next section.
 
-9. **Join or form a cluster.** The fork in the road — see the next section.
-
-10. **DKG attestation.** After you hold a seat, the cluster key ceremony attestation confirms your seat is live. It is verified per rotate intent.
+9. **DKG attestation.** After you hold a seat, the cluster key ceremony attestation confirms your seat is live. It is verified per rotate intent.
 
 ## 5. Join a cluster — or form one
 
@@ -136,7 +134,7 @@ Desktop opens the **welcome screen**: a ten-step checklist whose state is **dete
 
 **Form a new cluster.** Gather ten registered operators in Monarch Desktop's **Ceremony Room**: one operator proposes the 10-seat roster (7 active + 3 standby) and the terms, everyone claims a seat over the signed ceremony channel, the roster freezes, and all ten members sign a single consent digest that binds the exact configuration — then one active member submits the `formCluster` transaction. The full guide, including the cluster charter (per-member reward shares and the delegator share), walk-away semantics, and the offline JSON fallback, is in the Monarch Desktop repo: [`docs/ceremony.md`](https://github.com/monolythium/monarch-desktop/blob/master/docs/ceremony.md).
 
-Either way, once your seat activates your node proposes and signs as part of its cluster's 7-of-10 threshold, and the checklist shows ten of ten.
+Either way, once your seat activates your node proposes and signs as part of its cluster's 7-of-10 threshold, and the checklist shows nine of nine.
 
 ## Where to go next
 
