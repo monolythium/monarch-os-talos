@@ -49,6 +49,11 @@ on:
         required: false
         default: "defaults/testnet/genesis.toml"
         type: string
+      milestones_toml:
+        description: "Milestone config TOML staged into the extension and hashed in metadata"
+        required: false
+        default: "defaults/testnet/milestones.toml"
+        type: string
       monarch_desktop_min_version:
         description: "Minimum compatible Monarch Desktop version"
         required: false
@@ -157,11 +162,12 @@ jobs:
           echo "PROTOCORE_TAG=$PROTOCORE_TAG" >> "$GITHUB_ENV"
           echo "PROTOCORE_SOURCE=github.com/monolythium/protocore@$PROTOCORE_TAG/$PROTOCORE_ASSET" >> "$GITHUB_ENV"
 
-      - name: Verify protocore binary + genesis match chain-registry
+      - name: Verify protocore binary + genesis + milestones match chain-registry
         env:
           CHAIN_PROFILE: ${{ github.event.inputs.chain_profile || 'testnet' }}
           CHAIN_ID: ${{ github.event.inputs.chain_id || '69420' }}
           GENESIS_TOML: ${{ github.event.inputs.genesis_toml || 'defaults/testnet/genesis.toml' }}
+          MILESTONES_TOML: ${{ github.event.inputs.milestones_toml || 'defaults/testnet/milestones.toml' }}
           CHAIN_REGISTRY_REF: ${{ vars.CHAIN_REGISTRY_REF || 'master' }}
         run: |
           set -euo pipefail
@@ -185,6 +191,7 @@ jobs:
             REGISTRY_NETWORK="$registry_network" \
             REGISTRY_REF="$CHAIN_REGISTRY_REF" \
             GENESIS_TOML="$GENESIS_TOML" \
+            MILESTONES_TOML="$MILESTONES_TOML" \
             PROTOCORE_BINARY="$PROTOCORE_BINARY" \
             PROTOCORE_TAG="$PROTOCORE_TAG" \
             CHAIN_ID="$CHAIN_ID"
@@ -195,6 +202,7 @@ jobs:
           CHAIN_PROFILE: ${{ github.event.inputs.chain_profile || 'testnet' }}
           CHAIN_ID: ${{ github.event.inputs.chain_id || '69420' }}
           GENESIS_TOML: ${{ github.event.inputs.genesis_toml || 'defaults/testnet/genesis.toml' }}
+          MILESTONES_TOML: ${{ github.event.inputs.milestones_toml || 'defaults/testnet/milestones.toml' }}
           MONARCH_DESKTOP_CHANNEL: ${{ github.event.inputs.release_channel || 'testnet' }}
           MONARCH_DESKTOP_MIN_VERSION: ${{ github.event.inputs.monarch_desktop_min_version || '0.0.12' }}
           MONARCH_DESKTOP_MAX_VERSION: ${{ github.event.inputs.monarch_desktop_max_version || '<1.0.0' }}
@@ -261,6 +269,7 @@ jobs:
           CHAIN_PROFILE: ${{ github.event.inputs.chain_profile || 'testnet' }}
           CHAIN_ID: ${{ github.event.inputs.chain_id || '69420' }}
           GENESIS_TOML: ${{ github.event.inputs.genesis_toml || 'defaults/testnet/genesis.toml' }}
+          MILESTONES_TOML: ${{ github.event.inputs.milestones_toml || 'defaults/testnet/milestones.toml' }}
           CHAIN_REGISTRY_REF: ${{ vars.CHAIN_REGISTRY_REF || 'master' }}
         run: |
           set -euo pipefail
@@ -288,6 +297,7 @@ jobs:
             REGISTRY_NETWORK="$registry_network" \
             REGISTRY_REF="$CHAIN_REGISTRY_REF" \
             GENESIS_TOML="$GENESIS_TOML" \
+            MILESTONES_TOML="$MILESTONES_TOML" \
             PROTOCORE_BINARY="$PROTOCORE_BINARY" \
             PROTOCORE_TAG="$PROTOCORE_TAG" \
             CHAIN_ID="$CHAIN_ID" \

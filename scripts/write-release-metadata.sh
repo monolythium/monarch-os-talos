@@ -12,6 +12,7 @@ RELEASE_CHANNEL="${RELEASE_CHANNEL:-testnet}"
 CHAIN_PROFILE="${CHAIN_PROFILE:-testnet}"
 CHAIN_ID="${CHAIN_ID:-69420}"
 GENESIS_TOML="${GENESIS_TOML:-"$ROOT_DIR/defaults/$CHAIN_PROFILE/genesis.toml"}"
+MILESTONES_TOML="${MILESTONES_TOML:-"$ROOT_DIR/defaults/$CHAIN_PROFILE/milestones.toml"}"
 KERNEL_BASELINE_FILE="${KERNEL_BASELINE_FILE:-"$ROOT_DIR/kernel-hardening-baseline.json"}"
 MONARCH_DESKTOP_MIN_VERSION="${MONARCH_DESKTOP_MIN_VERSION:-0.0.5}"
 MONARCH_DESKTOP_MAX_VERSION="${MONARCH_DESKTOP_MAX_VERSION:-<1.0.0}"
@@ -53,6 +54,9 @@ DM_VERITY_EXPECTED_ROOT_HASHES="${DM_VERITY_EXPECTED_ROOT_HASHES:-}"
 [[ "$PROTOCORE_BINARY" = /* ]] || PROTOCORE_BINARY="$ROOT_DIR/$PROTOCORE_BINARY"
 if [[ -n "$GENESIS_TOML" && "$GENESIS_TOML" != /* ]]; then
   GENESIS_TOML="$ROOT_DIR/$GENESIS_TOML"
+fi
+if [[ -n "$MILESTONES_TOML" && "$MILESTONES_TOML" != /* ]]; then
+  MILESTONES_TOML="$ROOT_DIR/$MILESTONES_TOML"
 fi
 if [[ -n "$KERNEL_BASELINE_FILE" && "$KERNEL_BASELINE_FILE" != /* ]]; then
   KERNEL_BASELINE_FILE="$ROOT_DIR/$KERNEL_BASELINE_FILE"
@@ -172,6 +176,8 @@ generated_at="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
 protocore_version_value="$(protocore_version)"
 genesis_metadata_path="$(metadata_path_for_file "$GENESIS_TOML")"
 genesis_sha256="$(file_sha256_or_unknown "$GENESIS_TOML")"
+milestones_metadata_path="$(metadata_path_for_file "$MILESTONES_TOML")"
+milestones_sha256="$(file_sha256_or_unknown "$MILESTONES_TOML")"
 kernel_baseline_metadata_path="$(metadata_path_for_file "$KERNEL_BASELINE_FILE")"
 kernel_baseline_sha256="$(file_sha256_or_unknown "$KERNEL_BASELINE_FILE")"
 dm_verity_expected_root_hashes_json="$(hash_list_json "$DM_VERITY_EXPECTED_ROOT_HASHES")"
@@ -222,6 +228,8 @@ jq -s \
   --arg chain_id "$CHAIN_ID" \
   --arg genesis_path "$genesis_metadata_path" \
   --arg genesis_sha256 "$genesis_sha256" \
+  --arg milestones_path "$milestones_metadata_path" \
+  --arg milestones_sha256 "$milestones_sha256" \
   --arg kernel_baseline_path "$kernel_baseline_metadata_path" \
   --arg kernel_baseline_sha256 "$kernel_baseline_sha256" \
   --arg monarch_desktop_min_version "$MONARCH_DESKTOP_MIN_VERSION" \
@@ -244,6 +252,7 @@ jq -s \
   --arg protocore_lythiumseal_operator_index "$PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX" \
   --arg protocore_lythiumseal_operator_epoch "$PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH" \
   --argjson genesis_embedded "$(bool_json "$([[ -f "$GENESIS_TOML" ]] && printf true || printf false)")" \
+  --argjson milestones_embedded "$(bool_json "$([[ -f "$MILESTONES_TOML" ]] && printf true || printf false)")" \
   --argjson upgrade_requires_same_channel "$(bool_json "$UPGRADE_REQUIRES_SAME_CHANNEL")" \
   --arg state_migration_mode "$STATE_MIGRATION_MODE" \
   --arg state_migration_runbook_id "$STATE_MIGRATION_RUNBOOK_ID" \
@@ -614,6 +623,11 @@ jq -s \
           path: $genesis_path,
           sha256: $genesis_sha256,
           embedded_in_extension: $genesis_embedded
+        },
+        milestones: {
+          path: $milestones_path,
+          sha256: $milestones_sha256,
+          embedded_in_extension: $milestones_embedded
         }
       },
       compatibility: {
