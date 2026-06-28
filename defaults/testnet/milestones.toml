@@ -44,7 +44,7 @@ chain_id = 69420
 # Config id/version for this milestone set. Bump on every edit so operators and
 # tooling can refer to a specific revision of the rolling config. (Replaces the
 # dropped signer_set_id; carries no signing semantics.)
-config_id = "testnet-58-wallclock-h83000"
+config_id = "testnet-58-h83000-openseat-h87500"
 
 [[entries]]
 id = "testnet-bringup-unlock"
@@ -142,3 +142,20 @@ enabled = true
 id = "activate-58-block-timestamp-wallclock"
 height = 83000
 block_timestamp_wall_clock_height = 83000
+
+# --- Cassette upgrade: open-seat marketplace primitive (#147, audit-fixed) ----
+# Activates the five node-registry (0x1005) open-seat selectors
+# (advertiseSeat/applyForSeat/voteSeatAdmit/withdrawSeatApplication/closeSeat)
+# at height 87500. The fleet runs the corrected v0.2.3 binary B (sha
+# 8fcbaaa2…, which carries the gated selectors WITH the audit fixes #150/#152/
+# #153 — applyForSeat escrows the full self-bond, voteClusterAdmit rejects seat
+# applications, closeSeat enforces advertiser ownership). Below 87500 every
+# binary folds this entry as None and the selectors resolve to UnknownSelector
+# (byte-identical to the predecessor) — no fork during the staged roll. At
+# height >= 87500 binary B activates the (fixed) selectors. Field value ==
+# height per the in-tree activation contract:
+#   effective_at(h).open_seat_market_height.is_some_and(|a| h >= a)
+[[entries]]
+id = "activate-open-seat-marketplace"
+height = 87500
+open_seat_market_height = 87500
