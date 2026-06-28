@@ -44,7 +44,7 @@ chain_id = 69420
 # Config id/version for this milestone set. Bump on every edit so operators and
 # tooling can refer to a specific revision of the rolling config. (Replaces the
 # dropped signer_set_id; carries no signing semantics.)
-config_id = "testnet-58-h83000-openseat-h87500"
+config_id = "testnet-bip39-58-h6000-openseat-h8000"
 
 [[entries]]
 id = "testnet-bringup-unlock"
@@ -128,34 +128,34 @@ address = "0x000000000000000000000000000000000000110e"
 enabled = true
 
 # --- Rolling upgrade: F-INF-047 / issue #58 -------------------------------
-# Byzantine block.timestamp wall-clock clamp. Re-targeted to height 83000 — a
-# ~4h buffer above the ~76.4k live height at this revision (was 200000), to
-# bring the clamp into force sooner now that the rolling-config mechanism is
-# proven. The fleet rolls this config one node at a time, well before
-# activation. Below 83000 every node folds this entry as None (rule OFF, legacy
-# timestamp formula) and is byte-identical to the pre-edit baseline; at height
-# >= 83000 every node enforces the deterministic round-anchored timestamp
-# window (rejecting any proposer, honest or Byzantine, outside [floor,
-# floor + 1h]). Field value == height per the in-tree activation contract:
+# Byzantine block.timestamp wall-clock clamp. Re-targeted to height 6000 for the
+# BIP-39 re-genesis chain (genesis 0xaabb0f1e…, binary v0.2.4 c09638f0), a
+# comfortable buffer above the chain's early height so the fleet can roll this
+# config one node at a time well before activation. Below 6000 every node folds
+# this entry as None (rule OFF, legacy timestamp formula) and is byte-identical
+# to the pre-edit baseline; at height >= 6000 every node enforces the
+# deterministic round-anchored timestamp window (rejecting any proposer, honest
+# or Byzantine, outside [floor, floor + 1h]). Field value == height per the
+# in-tree activation contract:
 #   effective_at(h).block_timestamp_wall_clock_height.is_some_and(|a| h >= a)
 [[entries]]
 id = "activate-58-block-timestamp-wallclock"
-height = 83000
-block_timestamp_wall_clock_height = 83000
+height = 6000
+block_timestamp_wall_clock_height = 6000
 
-# --- Cassette upgrade: open-seat marketplace primitive (#147, audit-fixed) ----
+# --- Open-seat marketplace primitive (#147, audit-fixed) ----------------------
 # Activates the five node-registry (0x1005) open-seat selectors
 # (advertiseSeat/applyForSeat/voteSeatAdmit/withdrawSeatApplication/closeSeat)
-# at height 87500. The fleet runs the corrected v0.2.4 binary B (sha
-# c09638f0…, which carries the gated selectors WITH the audit fixes #150/#152/
-# #153 — applyForSeat escrows the full self-bond, voteClusterAdmit rejects seat
-# applications, closeSeat enforces advertiser ownership). Below 87500 every
+# at height 8000 on the BIP-39 re-genesis chain. The fleet runs binary v0.2.4
+# (sha c09638f0…, which carries the gated selectors WITH the audit fixes #150/
+# #152/#153 — applyForSeat escrows the full self-bond, voteClusterAdmit rejects
+# seat applications, closeSeat enforces advertiser ownership). Below 8000 every
 # binary folds this entry as None and the selectors resolve to UnknownSelector
 # (byte-identical to the predecessor) — no fork during the staged roll. At
-# height >= 87500 binary B activates the (fixed) selectors. Field value ==
+# height >= 8000 the binary activates the (fixed) selectors. Field value ==
 # height per the in-tree activation contract:
 #   effective_at(h).open_seat_market_height.is_some_and(|a| h >= a)
 [[entries]]
 id = "activate-open-seat-marketplace"
-height = 87500
-open_seat_market_height = 87500
+height = 8000
+open_seat_market_height = 8000

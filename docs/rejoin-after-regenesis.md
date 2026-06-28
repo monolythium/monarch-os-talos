@@ -8,7 +8,7 @@ quarantines. This guide gets you back onto the current chain.
 
 > **Current chain (2026-06-28):** genesis
 > `0xaabb0f1ea0e9cae9dcc4fbd3e2af577c3568b209061207f919d159c2ab4ba995`,
-> release **`protocore v0.2.4-testnet`** (mono-core `ca7e1f2e`). The
+> release **`protocore v0.2.4-testnet`** (mono-core `862f6bc0`). The
 > authoritative pin is always
 > [chain-registry / `chains/testnet-69420.toml`](https://github.com/monolythium/chain-registry/blob/master/chains/testnet-69420.toml)
 > (`genesis_hash`, `release_tag`, `binary_sha`). Do not hard-code the values
@@ -115,7 +115,7 @@ baked genesis, set `PROTOCORE_GENESIS_FALLBACK=fail`.
 ```bash
 curl -s http://127.0.0.1:8545 -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"web3_clientVersion","params":[]}'
-# expect: protocore/v2/v0.2.4-testnet+ca7e1f2   (match the registry release_tag)
+# expect: protocore/v2/v0.2.4-testnet+862f6bc   (match the registry release_tag)
 
 curl -s http://127.0.0.1:8545 -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"lyth_syncStatus","params":[]}'
