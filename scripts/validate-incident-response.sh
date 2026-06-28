@@ -133,7 +133,7 @@ release_metadata_sha="$(field '.evidence.release_metadata_sha256')"
   || fail "unsupported schema_version: $schema"
 [[ -n "$incident_id" ]] || fail "incident.id is required"
 case "$incident_type" in
-  pcr-drift|substrate-proof-failure|talos-ca-mismatch|certificate-expiry|protocore-rpc-down|ext-protocore-crash-loop|network-partition|cryptographic-break|bridge-exploit|adversarial-fork|key-share-compromise|release-provenance-failure) ;;
+  pcr-drift|substrate-proof-failure|talos-ca-mismatch|certificate-expiry|protocore-rpc-down|ext-protocore-crash-loop|network-partition|cryptographic-break|bridge-exploit|adversarial-fork|operator-key-compromise|release-provenance-failure) ;;
   routine-upgrade|parameter-change|protocol-direction|account-censorship|asset-confiscation|ongoing-supervision)
     fail "incident.type is outside the emergency mechanism scope: $incident_type"
     ;;
@@ -167,7 +167,7 @@ if jq -e '
 fi
 
 case "$action" in
-  observe|isolate-node|stop-signing|rotate-certs|rotate-key-share|pause-bridge-route|freeze-admission|emergency-key-rotation|rollback-bridge|publish-replacement-release|recover-node) ;;
+  observe|isolate-node|stop-signing|rotate-certs|rotate-operator-key|pause-bridge-route|freeze-admission|emergency-key-rotation|rollback-bridge|publish-replacement-release|recover-node) ;;
   *) fail "response.action is unsupported: $action" ;;
 esac
 case "$scope_type" in

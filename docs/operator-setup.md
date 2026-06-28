@@ -126,7 +126,7 @@ Desktop opens the **welcome screen**: a nine-step checklist whose state is **det
 
 8. **Join or form a cluster.** The fork in the road — see the next section.
 
-9. **DKG attestation.** After you hold a seat, the cluster key ceremony attestation confirms your seat is live. It is verified per rotate intent.
+9. **Seat activation.** After you hold a seat, your own ML-DSA-65 operator key joins the cluster's signing set. The cluster's round certificate is a 7-of-N bitmap multi-sig over the members' individual signatures, so your seat is confirmed live once the cluster produces a certificate whose `operator_bitmap` includes you.
 
 ## 5. Join a cluster — or form one
 

@@ -247,7 +247,7 @@ run_rebuild_check() {
 
   local channel chain_profile chain_id genesis_path desktop_channel desktop_min desktop_max same_channel
   local p2p_listen rpc_listen discovery enrollment_required enrollment_file digest_file tpm_required
-  local tpm_quote_file tpm_event_log_file tpm_sealed_bls_share_file dkg_transcript_file
+  local tpm_quote_file tpm_event_log_file tpm_sealed_operator_key_file
   local lythiumseal_operator_key_file generate_lythiumseal_operator_key
   local lythiumseal_operator_index lythiumseal_operator_epoch
   channel="$(metadata_field '.channel.name')"
@@ -267,8 +267,7 @@ run_rebuild_check() {
   tpm_required="$(metadata_field '.provisioning_policy.tpm_binding.required')"
   tpm_quote_file="$(metadata_field '.provisioning_policy.tpm_binding.quote_file_path')"
   tpm_event_log_file="$(metadata_field '.provisioning_policy.tpm_binding.event_log_file_path')"
-  tpm_sealed_bls_share_file="$(metadata_field '.provisioning_policy.tpm_binding.sealed_bls_share_file_path')"
-  dkg_transcript_file="$(metadata_field '.provisioning_policy.tpm_binding.dkg_transcript_file_path')"
+  tpm_sealed_operator_key_file="$(metadata_field '.provisioning_policy.tpm_binding.sealed_operator_key_file_path')"
   lythiumseal_operator_key_file="$(metadata_field '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_path')"
   generate_lythiumseal_operator_key="$(metadata_field '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.generate_value')"
   lythiumseal_operator_index="$(metadata_field '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.operator_index')"
@@ -298,8 +297,7 @@ run_rebuild_check() {
     PROTOCORE_REQUIRE_TPM_BINDING="$tpm_required" \
     PROTOCORE_TPM_QUOTE_FILE="$tpm_quote_file" \
     PROTOCORE_TPM_EVENT_LOG_FILE="$tpm_event_log_file" \
-    PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$tpm_sealed_bls_share_file" \
-    PROTOCORE_DKG_TRANSCRIPT_FILE="$dkg_transcript_file" \
+    PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="$tpm_sealed_operator_key_file" \
     PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="$lythiumseal_operator_key_file" \
     PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY="$generate_lythiumseal_operator_key" \
     PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX="$lythiumseal_operator_index" \
@@ -335,8 +333,7 @@ run_rebuild_check() {
     PROTOCORE_REQUIRE_TPM_BINDING="$tpm_required" \
     PROTOCORE_TPM_QUOTE_FILE="$tpm_quote_file" \
     PROTOCORE_TPM_EVENT_LOG_FILE="$tpm_event_log_file" \
-    PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$tpm_sealed_bls_share_file" \
-    PROTOCORE_DKG_TRANSCRIPT_FILE="$dkg_transcript_file" \
+    PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="$tpm_sealed_operator_key_file" \
     PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="$lythiumseal_operator_key_file" \
     PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY="$generate_lythiumseal_operator_key" \
     PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX="$lythiumseal_operator_index" \

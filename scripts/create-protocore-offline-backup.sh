@@ -176,7 +176,7 @@ jq -n \
     node: {
       node_id: $node_id,
       role: $node_role,
-      signing_node_restore_blocked_until_key_share_recovery: ($node_role == "operator-signing")
+      signing_node_restore_blocked_until_operator_key_recovery: ($node_role == "operator-signing")
     },
     source: {
       data_dir: $data_dir,

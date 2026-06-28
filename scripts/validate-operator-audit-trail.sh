@@ -284,7 +284,7 @@ intent_risk="$(field '.intent.risk')"
 [[ "$created_at" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]] \
   || fail "audit.created_at must be an RFC3339 UTC timestamp"
 case "$action" in
-  enrollment|dkg-ceremony|tpm-sealing|key-share-handoff|key-share-rotation|certificate-rotation|backup|restore|disaster-recovery|incident-response|freeze-admission|kill-switch-freeze|upgrade|rollback|desktop-operation|chat-e2e|release-promotion) ;;
+  enrollment|tpm-sealing|operator-key-rotation|certificate-rotation|backup|restore|disaster-recovery|incident-response|freeze-admission|kill-switch-freeze|upgrade|rollback|desktop-operation|chat-e2e|release-promotion) ;;
   *) fail "audit.action is unsupported: $action" ;;
 esac
 [[ -n "$reason" ]] || fail "audit.reason is required"
@@ -321,7 +321,7 @@ fi
 validate_hash32 "release.metadata_sha256" "$release_metadata_sha"
 validate_hash32 "release.protocore_digest" "$protocore_digest"
 case "$subject_type" in
-  enrollment|key-share-ceremony|tpm-sealing-evidence|key-share-handoff|incident-response|disaster-recovery|talos-certificate-rotation|offline-backup|offline-restore|desktop-operation|desktop-e2e|release) ;;
+  enrollment|tpm-sealing-evidence|incident-response|disaster-recovery|talos-certificate-rotation|offline-backup|offline-restore|desktop-operation|desktop-e2e|release) ;;
   *) fail "subject.type is unsupported: $subject_type" ;;
 esac
 [[ -n "$subject_id" ]] || fail "subject.id is required"
@@ -448,7 +448,7 @@ approval_count="$(jq -r '[.approvals[]?.signer] | unique | length' "$MANIFEST")"
 (( approval_count >= 1 )) || fail "approvals must include at least one unique signer"
 
 case "$intent_risk:$action" in
-  high:*|critical:*|*:dkg-ceremony|*:key-share-rotation|*:disaster-recovery|*:incident-response|*:freeze-admission|*:kill-switch-freeze|*:upgrade|*:rollback|*:release-promotion)
+  high:*|critical:*|*:operator-key-rotation|*:disaster-recovery|*:incident-response|*:freeze-admission|*:kill-switch-freeze|*:upgrade|*:rollback|*:release-promotion)
     (( approval_count >= 2 )) || fail "high-risk and production-control audit trails require at least two unique approvals"
     ;;
 esac

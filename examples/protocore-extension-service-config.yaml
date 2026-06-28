@@ -9,13 +9,12 @@ environment:
   - PROTOCORE_REQUIRE_ENROLLMENT=true
   - PROTOCORE_ENROLLMENT_FILE=/var/lib/protocore/enrollment/enrollment.json
   # Enable for operator nodes once the enrollment bundle includes
-  # TPM quote/event-log evidence, a staged LythiumSeal operator key, and the
-  # key transcript.
+  # TPM quote/event-log evidence and a staged, TPM-sealed LythiumSeal operator
+  # key (each operator holds its own ML-DSA-65 key).
   - PROTOCORE_REQUIRE_TPM_BINDING=false
   # - PROTOCORE_TPM_QUOTE_FILE=/var/lib/protocore/attestation/quote.bin
   # - PROTOCORE_TPM_EVENT_LOG_FILE=/var/lib/protocore/attestation/eventlog.bin
-  # - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
-  # - PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/dkg-transcript.json
+  # - PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
   # - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
   # Optional first-boot generation path. The operator index is 1-based and
   # must match the cluster seal-recipient slot for the configured epoch.

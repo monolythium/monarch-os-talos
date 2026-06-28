@@ -64,7 +64,6 @@ monarch-os-talos/
 │   ├── render-upgrade-plan.sh
 │   ├── resolve-desktop-e2e-evidence.sh
 │   ├── validate-enrollment-manifest.sh
-│   ├── validate-key-share-ceremony.sh
 │   ├── validate-talos-certificate-rotation.sh
 │   ├── validate-incident-response.sh
 │   ├── verify-desktop-e2e-evidence.sh
@@ -79,7 +78,6 @@ monarch-os-talos/
 │   └── protocore-extension-service-config.yaml
 ├── schemas/
 │   ├── protocore-enrollment-manifest.schema.json
-│   ├── protocore-key-share-ceremony.schema.json
 │   ├── monarch-fleet-upgrade-manifest.schema.json
 │   ├── talos-certificate-rotation.schema.json
 │   ├── monarch-incident-response.schema.json
@@ -87,7 +85,6 @@ monarch-os-talos/
 ├── docs/
 │   ├── install.md                      # substrate install guide for signed ISO/raw.xz
 │   ├── enrollment-manifest.md          # enrollment schema and validator contract
-│   ├── key-share-lifecycle.md          # DKG / rotation / recovery ceremony contract
 │   ├── talos-certificate-lifecycle.md  # Talos CA/client cert rotation contract
 │   ├── incident-response.md            # signed emergency/incident runbook contract
 │   ├── disaster-recovery.md            # stopped/offline backup + restore manifest contract
@@ -182,12 +179,9 @@ _out/monarch-os-talos-v1.13.0-amd64.iso.spdx.json  # via `make sbom`
 | `make fleet-upgrade-plan` | JSON dry-run plan | Renders a canary/rolling fleet upgrade plan from a `monarch-talos-fleet-upgrade-manifest/v1` manifest, with max-unavailable, DR, and signing-quorum gates. |
 | `make check-channel-promotion` | JSON promotion report | Applies `channel-policy.json` to a release metadata file and runs the required artifact/provenance verifier flags for that channel. |
 | `make validate-enrollment-manifest` | JSON validation report | Validates a first-boot enrollment manifest before placing it on a node. Requires `jq`. |
-| `make validate-tpm-attestation-evidence` | JSON validation report | Verifies enrollment TPM/DKG evidence file hashes and, for hardware TPM manifests, runs `tpm2_checkquote` unless disabled. |
+| `make validate-tpm-attestation-evidence` | JSON validation report | Verifies enrollment TPM attestation and sealed-operator-key evidence file hashes and, for hardware TPM manifests, runs `tpm2_checkquote` unless disabled. |
 | `make run-on-chain-enrollment` | enrollment run summary | Runs an external node-registry registration command through `ENROLLMENT_ON_CHAIN_COMMAND`, requires it to write an updated manifest with `on_chain_registration`, then validates the canonical registration evidence and optional TPM evidence. |
-| `make validate-key-share-ceremony` | JSON validation report | Validates a DKG/key-share rotation, recovery, reseal, or revocation ceremony manifest. Requires `jq`. |
-| `make run-production-dkg-ceremony` | DKG run summary + handoffs | Runs a real external DKG/sealing command through `DKG_CEREMONY_COMMAND`, requires it to materialize the key-share manifest/evidence/DKG attestation, then feeds the existing key-share runner and validators. |
 | `make test-on-chain-enrollment-runner` | JSON test report | Verifies the on-chain enrollment runner accepts valid registration proof and rejects missing external commands, missing proofs, and strict vTPM enrollment. |
-| `make test-enrollment-and-key-share-validators` | JSON test report | Verifies enrollment and key-share validator positive/negative cases, including TPM evidence hash binding. |
 | `make validate-talos-certificate-rotation` | JSON validation report | Validates a signed Talos CA/client certificate rotation bundle and optional Desktop post-rotation evidence. |
 | `make test-talos-certificate-rotation` | JSON test report | Verifies Talos certificate rotation payload binding, Desktop-evidence requirement, expiry-window rejection, and unchanged-identity rejection. |
 | `make validate-incident-response` | JSON validation report | Validates a signed incident/freeze/recovery runbook bundle and binds emergency on-chain evidence to the canonical executor contract, method, and selector. Requires `jq`. |
@@ -228,9 +222,9 @@ Environment knobs:
 | `PROTOCORE_REQUIRE_ENROLLMENT` | `false` | When `true`, the entrypoint refuses to start unless the enrollment manifest and release digest are present. |
 | `PROTOCORE_ENROLLMENT_FILE` | `/var/lib/protocore/enrollment/enrollment.json` | Enrollment manifest path checked by the entrypoint and release verifier. |
 | `PROTOCORE_EXPECTED_DIGEST_FILE` | unset | Release digest file path for fail-closed enrollment. The release workflow uses `/var/lib/protocore/enrollment/protocore.sha256`. |
-| `PROTOCORE_REQUIRE_TPM_BINDING` | `false` | When `true`, the entrypoint requires TPM quote/event-log evidence, a TPM-sealed share, and a DKG transcript. |
+| `PROTOCORE_REQUIRE_TPM_BINDING` | `false` | When `true`, the entrypoint requires TPM quote/event-log evidence and a TPM-sealed operator key (each operator holds its own ML-DSA-65 key). |
 | `PROTOCORE_TPM_QUOTE_FILE` / `PROTOCORE_TPM_EVENT_LOG_FILE` | unset | TPM quote and event-log evidence paths. The QEMU smoke config can stage synthetic vTPM testnet fixtures for these paths. |
-| `PROTOCORE_TPM_SEALED_BLS_SHARE_FILE` / `PROTOCORE_DKG_TRANSCRIPT_FILE` | unset | Legacy-named TPM-sealed share and DKG transcript paths required by TPM-bound operator nodes. |
+| `PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE` | unset | Path to the TPM-sealed operator key required by TPM-bound operator nodes. |
 | `LOCAL_EVIDENCE_ROOT` | unset | Local root used by `make validate-tpm-attestation-evidence` to resolve `/var/lib/protocore/...` evidence paths from an offline bundle. |
 | `REQUIRE_TPM2_CHECKQUOTE` | `auto` | `auto` runs `tpm2_checkquote` for `hardware-tpm2` manifests, `true` always requires it, and `false` verifies hashes only. |
 | `REQUIRE_TALOS_API_PROBE` / `REQUIRE_TALOSCTL_PROBE` | `false` | When `true`, `smoke-qemu` must prove Talos API reachability; it uses `talosctl version --insecure` when `talosctl` is installed and falls back to TCP-only evidence otherwise. |
@@ -245,7 +239,7 @@ Environment knobs:
 | `REQUIRE_SUBSTRATE_PROOF` | `false` | When `true`, `verify-artifacts` rejects extension tarballs that add shell, SSH, package-manager payloads, unsafe entrypoints, or unexpected writable mounts. |
 | `REQUIRE_NETWORK_POLICY` | `false` | When `true`, `verify-artifacts` checks release metadata and extension service config agree on Talos/Protocore network exposure policy. |
 | `REQUIRE_PROVISIONING_POLICY` | `false` | When `true`, `verify-artifacts` checks no default/inline secret env is shipped and enrollment policy is pinned. |
-| `REQUIRE_DISASTER_RECOVERY_POLICY` | `false` | When `true`, `verify-artifacts` checks release metadata publishes the disaster-recovery schema, validator, safe backup rules, signing-node key-share recovery requirement, and mainnet recovery executor binding. |
+| `REQUIRE_DISASTER_RECOVERY_POLICY` | `false` | When `true`, `verify-artifacts` checks release metadata publishes the disaster-recovery schema, validator, safe backup rules, signing-node operator-key recovery requirement, and mainnet recovery executor binding. |
 | `REQUIRE_COSIGN_SIGNATURES` | `false` | When `true`, `verify-provenance` verifies adjacent `.sig` and `.pem` files with cosign. |
 | `REQUIRE_GITHUB_ATTESTATIONS` | `false` | When `true`, `verify-provenance` verifies GitHub SLSA provenance attestations for release artifacts. |
 | `ATTESTATION_MODE` | `online` | `verify-provenance` mode: `online`, `download`, or `offline`. Download mode writes attestation bundles and trusted roots for offline use. |
@@ -266,7 +260,7 @@ Environment knobs:
 | `REQUIRE_SMOKE_QEMU_RPC` | `false` | When `true`, `verify-artifacts` requires smoke output proving Protocore RPC answered. |
 | `REQUIRE_SMOKE_QEMU_TALOSCTL` | `false` | When `true`, `verify-artifacts` requires the QEMU smoke result to come from a real `talosctl` API probe, not TCP-only reachability. |
 | `REQUIRE_ENROLLMENT_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` reads the staged enrollment manifest and release digest through Talos API and verifies the operator-signing, 7-of-10, chain, digest, and mainnet on-chain registration call-binding contract. |
-| `REQUIRE_TPM_BINDING_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` also verifies TPM quote/event-log, TPM-sealed share, and DKG transcript file evidence. |
+| `REQUIRE_TPM_BINDING_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` also verifies TPM quote/event-log and TPM-sealed operator key file evidence. |
 | `REQUIRE_SUBSTRATE_RUNTIME_PROOF` | `false` | When `true`, `smoke-qemu` reads `/proc/config.gz`, `/proc/mounts`, `/proc/cmdline`, `/proc/modules`, and `/proc/filesystems` through Talos API and `verify-artifacts` requires proof that root is read-only, an immutable base filesystem is mounted read-only, required kernel options are enabled, and required attack-surface options are disabled or absent. |
 | `REQUIRE_DM_VERITY_ACTIVE` | `false` | When `true`, `verify-artifacts` requires runtime proof of active dm-verity, root-hash evidence from the booted image, and a runtime hash matching `substrate.dm_verity.expected_root_hashes` in release metadata. Mainnet policy sets this to `true`; current testnet keeps it observable but not required until the Talos artifact exposes a stable root hash. |
 | `KEEP_QEMU_ALIVE` | `false` | When `true`, `smoke-qemu` writes `_out/smoke-qemu/live-env.sh` with Desktop e2e settings, including the expected Protocore digest from release metadata when available, and keeps the QEMU VM running until the smoke process is stopped. |
@@ -292,9 +286,7 @@ Environment knobs:
 | `ENROLLMENT_ON_CHAIN_STRICT` | `true` | When `true`, the on-chain enrollment runner requires release digest, hardware TPM, local TPM evidence, and validated on-chain registration proof. |
 | `ENROLLMENT_ON_CHAIN_OUTPUT_DIR` / `ENROLLMENT_ON_CHAIN_MANIFEST` | `_out/on-chain-enrollment` / `<output>/enrollment.on-chain.json` | Output directory and updated manifest path for `make run-on-chain-enrollment`. |
 | `REQUIRE_ON_CHAIN_REGISTRATION` / `ALLOW_PENDING_ON_CHAIN_REGISTRATION` | `false` / `false` | Enrollment validator controls for final on-chain proof and pre-registration mainnet manifests. The runner uses pending mode only for its input manifest and requires proof on output. |
-| `KEY_SHARE_CEREMONY` | unset | Input manifest for `make validate-key-share-ceremony`. |
-| `REQUIRE_ON_CHAIN_LIFECYCLE` | `false` | When `true`, the key-share ceremony validator requires on-chain lifecycle tx, DAG round, quorum, method/selector, calldata-hash, and canonical payload-hash evidence even outside mainnet. |
-| `REQUIRE_HARDWARE_TPM` | `false` | When `true`, the key-share ceremony validator rejects vTPM entries even outside mainnet. |
+| `REQUIRE_HARDWARE_TPM` | `false` | When `true`, the enrollment/attestation validators reject vTPM entries even outside mainnet. |
 | `TALOS_CERTIFICATE_ROTATION` | unset | Input manifest for `make validate-talos-certificate-rotation`. |
 | `REQUIRE_DESKTOP_EVIDENCE` | `false` | When `true`, Talos certificate rotation validation requires post-rotation Desktop e2e evidence bound to the next CA fingerprint and endpoint. |
 | `MIN_CERT_VALIDITY_DAYS` | `30` | Minimum validity horizon required for next Talos CA/client certificates in rotation manifests. |
@@ -484,7 +476,6 @@ cosign-signed by [`monolythium/protocore`](https://github.com/monolythium/protoc
 - [`docs/operator-setup.md`](./docs/operator-setup.md) — **the canonical "run a Monolythium operator node" guide**: verify the signed ISO, flash/boot (bare-metal or cloud), first-boot dynamic genesis resolution, install Monarch Desktop, the ten-step welcome checklist, and join-vs-form-a-cluster.
 - [`docs/install.md`](./docs/install.md) — install a node on **home / bare-metal** (old PC, NUC, laptop — the hardware-TPM sovereignty path) or the **top cloud providers** (Hetzner, DigitalOcean, AWS, GCP, Vultr) from the signed ISO / `raw.xz`. Verify → write → boot → sync, plus the cloud-vs-bare-metal trust posture.
 - [`docs/enrollment-manifest.md`](./docs/enrollment-manifest.md) — first-boot enrollment manifest schema and local validator.
-- [`docs/key-share-lifecycle.md`](./docs/key-share-lifecycle.md) — DKG/key-share rotation, recovery, reseal, and revocation ceremony schema and validator.
 - [`docs/talos-certificate-lifecycle.md`](./docs/talos-certificate-lifecycle.md) — Talos CA/client certificate rotation schema, payload binding, and Desktop evidence gate.
 - [`docs/incident-response.md`](./docs/incident-response.md) — signed incident/freeze/recovery runbook schema and validator.
 - [`docs/disaster-recovery.md`](./docs/disaster-recovery.md) — resync, stopped/offline restore, disk replacement, and signing-node reseal manifest schema and validator.
@@ -507,7 +498,7 @@ the source-adjacent reference.
 1. Checkout, install `cosign`, `syft`, QEMU, and `talosctl`, then set up Docker buildx.
 2. Log in to `ghcr.io` (uses the runner's automatic `GITHUB_TOKEN`).
 3. Download the selected `protocore` Linux release asset and verify its `.sha256`.
-4. Build ISO/raw/extension artifacts with enrollment and TPM binding required, generate SBOMs, generate Talos smoke config with a QEMU-only enrollment/TPM/DKG bundle, boot the raw image in QEMU, apply the config, require a real `talosctl` API probe plus enrollment proof, TPM/DKG/key-share proof, `ext-protocore`, Protocore RPC, runtime substrate evidence, incident-response policy, and disaster-recovery policy, compress the raw image, write release metadata, and generate the deterministic extension rebuild witness. Production enrollment uses `make run-on-chain-enrollment` to invoke the external node-registry registration command and validate the updated on-chain manifest proof; production key-share transitions use `make run-production-dkg-ceremony` to invoke the external distributed DKG/sealing command and validate the resulting transcript, TPM-sealed shares, Desktop attestation, and operator handoffs. Mainnet promotion additionally requires the full release rebuild witness.
+4. Build ISO/raw/extension artifacts with enrollment and TPM binding required, generate SBOMs, generate Talos smoke config with a QEMU-only enrollment/TPM bundle, boot the raw image in QEMU, apply the config, require a real `talosctl` API probe plus enrollment proof, TPM/operator-key proof, `ext-protocore`, Protocore RPC, runtime substrate evidence, incident-response policy, and disaster-recovery policy, compress the raw image, write release metadata, and generate the deterministic extension rebuild witness. Production enrollment uses `make run-on-chain-enrollment` to invoke the external node-registry registration command and validate the updated on-chain manifest proof. Mainnet promotion additionally requires the full release rebuild witness.
 5. Sign ISO/raw/extension/metadata/SBOM/rebuild-witness artifacts with `cosign sign-blob` (Sigstore keyless via GitHub OIDC).
 6. Generate GitHub build provenance attestations for the release artifacts and extension rebuild witness.
 7. Resolve Monarch Desktop GUI/Tauri e2e evidence from a Desktop release, workflow artifact, direct URL, or local path; verify the complete artifact set and run `make check-channel-promotion` against `channel-policy.json`. Testnet promotion also verifies Desktop two-party chat evidence, enrollment/TPM smoke evidence, signatures/attestations, the extension rebuild witness, and exports offline attestation bundles.

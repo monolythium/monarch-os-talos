@@ -31,10 +31,8 @@
           "type": "string",
           "enum": [
             "enrollment",
-            "dkg-ceremony",
             "tpm-sealing",
-            "key-share-handoff",
-            "key-share-rotation",
+            "operator-key-rotation",
             "certificate-rotation",
             "backup",
             "restore",
@@ -97,9 +95,7 @@
           "type": "string",
           "enum": [
             "enrollment",
-            "key-share-ceremony",
             "tpm-sealing-evidence",
-            "key-share-handoff",
             "incident-response",
             "disaster-recovery",
             "talos-certificate-rotation",

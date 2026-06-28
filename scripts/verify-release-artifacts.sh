@@ -175,8 +175,8 @@ check_smoke_qemu() {
       || fail "enrollment runtime proof did not verify TPM mode"
     jq -e '.tpm.pcrs | sort == [0, 2, 4, 7]' "$enrollment_log" >/dev/null \
       || fail "enrollment runtime proof did not verify TPM PCR policy"
-    jq -e '.file_hashes | map(.label) as $labels | ($labels | index("tpm_quote")) and ($labels | index("tpm_event_log")) and ($labels | index("lythiumseal_operator_key")) and (($labels | index("key_transcript")) or ($labels | index("dkg_transcript")))' "$enrollment_log" >/dev/null \
-      || fail "enrollment runtime proof lacks TPM/key-transcript file evidence"
+    jq -e '.file_hashes | map(.label) as $labels | ($labels | index("tpm_quote")) and ($labels | index("tpm_event_log")) and ($labels | index("lythiumseal_operator_key"))' "$enrollment_log" >/dev/null \
+      || fail "enrollment runtime proof lacks TPM/operator-key file evidence"
     jq -e '
       def norm: ascii_downcase | ltrimstr("0x");
       . as $root |
@@ -184,14 +184,12 @@ check_smoke_qemu() {
       and (.tpm.event_log_sha256 | test("^(0x)?[0-9a-fA-F]{64}$"))
       and (.tpm.quote_nonce | test("^(0x)?[0-9a-fA-F]{64}$"))
       and (.tpm.pcr_policy_hash | test("^(0x)?[0-9a-fA-F]{64}$"))
-      and (.tpm.dkg_transcript_sha256 | test("^(0x)?[0-9a-fA-F]{64}$"))
-      and (.tpm.sealed_share_sha256 | test("^(0x)?[0-9a-fA-F]{64}$"))
+      and (.tpm.sealed_operator_key_sha256 | test("^(0x)?[0-9a-fA-F]{64}$"))
       and any($root.file_hashes[]; .label == "tpm_quote" and (.sha256 | norm) == ($root.tpm.quote_sha256 | norm))
       and any($root.file_hashes[]; .label == "tpm_event_log" and (.sha256 | norm) == ($root.tpm.event_log_sha256 | norm))
-      and any($root.file_hashes[]; .label == "lythiumseal_operator_key" and (.sha256 | norm) == ($root.tpm.sealed_share_sha256 | norm))
-      and any($root.file_hashes[]; (.label == "key_transcript" or .label == "dkg_transcript") and (.sha256 | norm) == ($root.tpm.dkg_transcript_sha256 | norm))
+      and any($root.file_hashes[]; .label == "lythiumseal_operator_key" and (.sha256 | norm) == ($root.tpm.sealed_operator_key_sha256 | norm))
     ' "$enrollment_log" >/dev/null \
-      || fail "enrollment runtime proof does not bind TPM/key-transcript file hashes to manifest claims"
+      || fail "enrollment runtime proof does not bind TPM/operator-key file hashes to manifest claims"
   fi
   if [[ "$REQUIRE_SUBSTRATE_RUNTIME_PROOF" == "true" ]]; then
     [[ "$substrate_proof" == "ok" ]] \
@@ -462,7 +460,7 @@ check_network_policy() {
 }
 
 check_provisioning_policy() {
-  local no_default inline_prohibited enrollment_required enrollment_path enrollment_schema enrollment_schema_path enrollment_validator enrollment_hashes_required enrollment_payload_schema enrollment_payload_canonicalization enrollment_payload_hash enrollment_payload_validator enrollment_on_chain_required enrollment_call_binding_required enrollment_payload_binding_required registration_method registration_signature registration_selector attestation_binding digest_env digest_file_env digest_file_path tpm_required tpm_env tpm_quote_env tpm_quote_path tpm_event_log_env tpm_event_log_path tpm_sealed_operator_env tpm_sealed_operator_path tpm_sealed_env tpm_sealed_path tpm_quote_validator tpm_quote_tool tpm_quote_hardware_required tpm_quote_mainnet_required key_transcript_env key_transcript_path dkg_env dkg_path lifecycle_schema lifecycle_schema_path lifecycle_validator lifecycle_cluster_size lifecycle_threshold lifecycle_approval_threshold lifecycle_mainnet lifecycle_hardware_tpm lifecycle_tpm_binding lifecycle_payload_schema lifecycle_payload_canonicalization lifecycle_payload_hash lifecycle_payload_validator lifecycle_payload_ceremony_method lifecycle_payload_ceremony_selector lifecycle_payload_attestation_method lifecycle_payload_attestation_selector lifecycle_on_chain
+  local no_default inline_prohibited enrollment_required enrollment_path enrollment_schema enrollment_schema_path enrollment_validator enrollment_hashes_required enrollment_payload_schema enrollment_payload_canonicalization enrollment_payload_hash enrollment_payload_validator enrollment_on_chain_required enrollment_call_binding_required enrollment_payload_binding_required registration_method registration_signature registration_selector attestation_binding digest_env digest_file_env digest_file_path tpm_required tpm_env tpm_quote_env tpm_quote_path tpm_event_log_env tpm_event_log_path tpm_sealed_operator_env tpm_sealed_operator_path tpm_quote_validator tpm_quote_tool tpm_quote_hardware_required tpm_quote_mainnet_required
   no_default="$(jq -r '.provisioning_policy.no_default_secrets // ""' "$metadata_path")"
   inline_prohibited="$(jq -r '.provisioning_policy.inline_secret_env_prohibited // ""' "$metadata_path")"
   enrollment_required="$(jq -r '.provisioning_policy.enrollment.required' "$metadata_path")"
@@ -493,8 +491,6 @@ check_provisioning_policy() {
   tpm_event_log_path="$(jq -r '.provisioning_policy.tpm_binding.event_log_file_path // ""' "$metadata_path")"
   tpm_sealed_operator_env="$(jq -r '.provisioning_policy.tpm_binding.sealed_operator_key_file_env // ""' "$metadata_path")"
   tpm_sealed_operator_path="$(jq -r '.provisioning_policy.tpm_binding.sealed_operator_key_file_path // ""' "$metadata_path")"
-  tpm_sealed_env="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_env // ""' "$metadata_path")"
-  tpm_sealed_path="$(jq -r '.provisioning_policy.tpm_binding.sealed_bls_share_file_path // ""' "$metadata_path")"
   local lythiumseal_env lythiumseal_path lythiumseal_ek_path lythiumseal_generate lythiumseal_index lythiumseal_epoch
   lythiumseal_env="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_env // ""' "$metadata_path")"
   lythiumseal_path="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_file_path // ""' "$metadata_path")"
@@ -502,77 +498,10 @@ check_provisioning_policy() {
   lythiumseal_generate="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.generate_value // ""' "$metadata_path")"
   lythiumseal_index="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.operator_index // ""' "$metadata_path")"
   lythiumseal_epoch="$(jq -r '.provisioning_policy.tpm_binding.lythiumseal_operator_key_generation.epoch // ""' "$metadata_path")"
-  key_transcript_env="$(jq -r '.provisioning_policy.tpm_binding.key_transcript_file_env // ""' "$metadata_path")"
-  key_transcript_path="$(jq -r '.provisioning_policy.tpm_binding.key_transcript_file_path // ""' "$metadata_path")"
-  dkg_env="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_env // ""' "$metadata_path")"
-  dkg_path="$(jq -r '.provisioning_policy.tpm_binding.dkg_transcript_file_path // ""' "$metadata_path")"
-  if [[ -z "$tpm_sealed_operator_env" ]]; then
-    tpm_sealed_operator_env="$tpm_sealed_env"
-    tpm_sealed_operator_path="$tpm_sealed_path"
-  fi
-  if [[ -z "$key_transcript_env" ]]; then
-    key_transcript_env="$dkg_env"
-    key_transcript_path="$dkg_path"
-  fi
   tpm_quote_validator="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.validator // ""' "$metadata_path")"
   tpm_quote_tool="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.tool // ""' "$metadata_path")"
   tpm_quote_hardware_required="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.required_for_hardware_tpm // false' "$metadata_path")"
   tpm_quote_mainnet_required="$(jq -r '.provisioning_policy.tpm_binding.quote_verification.required_for_mainnet_operator_signing // false' "$metadata_path")"
-  tpm_sealing_schema="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.schema // ""' "$metadata_path")"
-  tpm_sealing_schema_path="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.schema_path // ""' "$metadata_path")"
-  tpm_sealing_validator="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.validator // ""' "$metadata_path")"
-  tpm_sealing_required="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.required_for_operator_signing // false' "$metadata_path")"
-  tpm_sealing_mainnet_required="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.required_for_mainnet_operator_signing // false' "$metadata_path")"
-  tpm_sealing_hardware_required="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.requires_hardware_tpm_on_mainnet // false' "$metadata_path")"
-  tpm_sealing_payload_schema="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.signed_payload_schema // ""' "$metadata_path")"
-  tpm_sealing_canonicalization="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.canonicalization // ""' "$metadata_path")"
-  tpm_sealing_hash="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.hash // ""' "$metadata_path")"
-  tpm_sealing_binds_ceremony="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.binds_key_share_ceremony // false' "$metadata_path")"
-  tpm_sealing_binds_enrollment="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.binds_enrollment_manifest // false' "$metadata_path")"
-  tpm_sealing_quote_hashes="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.verifies_tpm_quote_event_log_hashes // false' "$metadata_path")"
-  tpm_sealing_policy_binding="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.verifies_policy_digest_binding // false' "$metadata_path")"
-  tpm_sealing_unseal_binding="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.verifies_unseal_plaintext_hash_binding // false' "$metadata_path")"
-  tpm_sealing_share_hash="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.verifies_sealed_share_file_hash // false' "$metadata_path")"
-  tpm_sealing_object_blobs="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.verifies_tpm2_object_blobs // false' "$metadata_path")"
-  tpm_sealing_local_env="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.local_file_hash_verification_env // ""' "$metadata_path")"
-  tpm_sealing_local_toggle_env="$(jq -r '.provisioning_policy.tpm_binding.sealing_evidence.local_file_hash_verification_toggle_env // ""' "$metadata_path")"
-  lifecycle_schema="$(jq -r '.provisioning_policy.key_share_lifecycle.schema // ""' "$metadata_path")"
-  lifecycle_schema_path="$(jq -r '.provisioning_policy.key_share_lifecycle.schema_path // ""' "$metadata_path")"
-  lifecycle_validator="$(jq -r '.provisioning_policy.key_share_lifecycle.validator // ""' "$metadata_path")"
-  lifecycle_cluster_size="$(jq -r '.provisioning_policy.key_share_lifecycle.cluster_size // 0' "$metadata_path")"
-  lifecycle_threshold="$(jq -r '.provisioning_policy.key_share_lifecycle.threshold // 0' "$metadata_path")"
-  lifecycle_approval_threshold="$(jq -r '.provisioning_policy.key_share_lifecycle.approval_threshold // 0' "$metadata_path")"
-  lifecycle_mainnet="$(jq -r '.provisioning_policy.key_share_lifecycle.required_for_mainnet_operator_signing // false' "$metadata_path")"
-  lifecycle_hardware_tpm="$(jq -r '.provisioning_policy.key_share_lifecycle.requires_hardware_tpm_on_mainnet // false' "$metadata_path")"
-  lifecycle_tpm_binding="$(jq -r '.provisioning_policy.key_share_lifecycle.requires_tpm_evidence_hash_binding // false' "$metadata_path")"
-  lifecycle_local_env="$(jq -r '.provisioning_policy.key_share_lifecycle.local_file_hash_verification_env // ""' "$metadata_path")"
-  lifecycle_local_toggle_env="$(jq -r '.provisioning_policy.key_share_lifecycle.local_file_hash_verification_toggle_env // ""' "$metadata_path")"
-  lifecycle_verifies_dkg_file="$(jq -r '.provisioning_policy.key_share_lifecycle.verifies_dkg_transcript_file // false' "$metadata_path")"
-  lifecycle_verifies_all_share_files="$(jq -r '.provisioning_policy.key_share_lifecycle.verifies_all_sealed_share_output_files // false' "$metadata_path")"
-  lifecycle_payload_schema="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.schema // ""' "$metadata_path")"
-  lifecycle_payload_canonicalization="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.canonicalization // ""' "$metadata_path")"
-  lifecycle_payload_hash="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.hash // ""' "$metadata_path")"
-  lifecycle_payload_validator="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.validator // ""' "$metadata_path")"
-  lifecycle_payload_ceremony_method="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.methods.ceremony // ""' "$metadata_path")"
-  lifecycle_payload_ceremony_selector="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.methods.ceremony_selector // ""' "$metadata_path")"
-  lifecycle_payload_attestation_method="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.methods.attestation // ""' "$metadata_path")"
-  lifecycle_payload_attestation_selector="$(jq -r '.provisioning_policy.key_share_lifecycle.on_chain_lifecycle_payload.methods.attestation_selector // ""' "$metadata_path")"
-  lifecycle_on_chain="$(jq -r '.provisioning_policy.key_share_lifecycle.requires_on_chain_lifecycle_on_mainnet // false' "$metadata_path")"
-  local handoff_schema handoff_schema_path handoff_renderer handoff_validator handoff_source_schema handoff_required handoff_ceremony_sha handoff_roster_binding handoff_share_binding handoff_transcript_binding handoff_local_env handoff_local_toggle_env handoff_sealed_path handoff_dkg_path
-  handoff_schema="$(jq -r '.provisioning_policy.key_share_handoff.schema // ""' "$metadata_path")"
-  handoff_schema_path="$(jq -r '.provisioning_policy.key_share_handoff.schema_path // ""' "$metadata_path")"
-  handoff_renderer="$(jq -r '.provisioning_policy.key_share_handoff.renderer // ""' "$metadata_path")"
-  handoff_validator="$(jq -r '.provisioning_policy.key_share_handoff.validator // ""' "$metadata_path")"
-  handoff_source_schema="$(jq -r '.provisioning_policy.key_share_handoff.source_schema // ""' "$metadata_path")"
-  handoff_required="$(jq -r '.provisioning_policy.key_share_handoff.required_for_operator_signing_import // false' "$metadata_path")"
-  handoff_ceremony_sha="$(jq -r '.provisioning_policy.key_share_handoff.ceremony_manifest_sha256_required // false' "$metadata_path")"
-  handoff_roster_binding="$(jq -r '.provisioning_policy.key_share_handoff.verifies_operator_roster_binding // false' "$metadata_path")"
-  handoff_share_binding="$(jq -r '.provisioning_policy.key_share_handoff.verifies_tpm_sealed_share_hash_binding // false' "$metadata_path")"
-  handoff_transcript_binding="$(jq -r '.provisioning_policy.key_share_handoff.verifies_dkg_transcript_hash_binding // false' "$metadata_path")"
-  handoff_local_env="$(jq -r '.provisioning_policy.key_share_handoff.local_file_hash_verification_env // ""' "$metadata_path")"
-  handoff_local_toggle_env="$(jq -r '.provisioning_policy.key_share_handoff.local_file_hash_verification_toggle_env // ""' "$metadata_path")"
-  handoff_sealed_path="$(jq -r '.provisioning_policy.key_share_handoff.import_paths.sealed_share_file // ""' "$metadata_path")"
-  handoff_dkg_path="$(jq -r '.provisioning_policy.key_share_handoff.import_paths.dkg_transcript_file // ""' "$metadata_path")"
 
   [[ "$no_default" == "true" ]] || fail "provisioning policy must declare no default secrets"
   [[ "$inline_prohibited" == "true" ]] || fail "provisioning policy must prohibit inline secret env"
@@ -632,17 +561,11 @@ check_provisioning_policy() {
     [[ "$tpm_event_log_path" == "/var/lib/protocore/attestation/eventlog.bin" ]] \
       || fail "provisioning policy TPM event-log file path mismatch: $tpm_event_log_path"
   fi
-  [[ "$tpm_sealed_operator_env" == "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE" || "$tpm_sealed_operator_env" == "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" ]] \
+  [[ "$tpm_sealed_operator_env" == "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE" ]] \
     || fail "provisioning policy TPM sealed operator key file env mismatch: $tpm_sealed_operator_env"
   if [[ "$tpm_required" == "true" ]]; then
     [[ "$tpm_sealed_operator_path" == "$lythiumseal_path" ]] \
       || fail "provisioning policy TPM sealed operator key path must match LythiumSeal key path: sealed=$tpm_sealed_operator_path lythiumseal=$lythiumseal_path"
-  fi
-  [[ "$tpm_sealed_env" == "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" ]] \
-    || fail "provisioning policy TPM sealed BLS share file env mismatch: $tpm_sealed_env"
-  if [[ "$tpm_required" == "true" ]]; then
-    [[ "$tpm_sealed_path" == "$lythiumseal_path" ]] \
-      || fail "provisioning policy TPM sealed share alias must match LythiumSeal key path: sealed=$tpm_sealed_path lythiumseal=$lythiumseal_path"
   fi
   [[ "$lythiumseal_env" == "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" ]] \
     || fail "provisioning policy LythiumSeal operator key env mismatch: $lythiumseal_env"
@@ -652,18 +575,6 @@ check_provisioning_policy() {
     [[ "$lythiumseal_path" == "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc" ]] \
       || fail "provisioning policy LythiumSeal operator key path mismatch: $lythiumseal_path"
   fi
-  [[ "$key_transcript_env" == "PROTOCORE_KEY_TRANSCRIPT_FILE" || "$key_transcript_env" == "PROTOCORE_DKG_TRANSCRIPT_FILE" ]] \
-    || fail "provisioning policy key transcript file env mismatch: $key_transcript_env"
-  if [[ "$tpm_required" == "true" ]]; then
-    [[ "$key_transcript_path" == "/var/lib/protocore/secrets/key-transcript.json" || "$key_transcript_path" == "/var/lib/protocore/secrets/dkg-transcript.json" ]] \
-      || fail "provisioning policy key transcript file path mismatch: $key_transcript_path"
-  fi
-  [[ "$dkg_env" == "PROTOCORE_DKG_TRANSCRIPT_FILE" ]] \
-    || fail "provisioning policy DKG transcript file env mismatch: $dkg_env"
-  if [[ "$tpm_required" == "true" ]]; then
-    [[ "$dkg_path" == "$key_transcript_path" ]] \
-      || fail "provisioning policy DKG transcript alias must match key transcript path: dkg=$dkg_path key_transcript=$key_transcript_path"
-  fi
   [[ "$tpm_quote_validator" == "scripts/validate-tpm-attestation-evidence.sh" ]] \
     || fail "TPM quote verification validator mismatch: $tpm_quote_validator"
   [[ -x "$ROOT_DIR/$tpm_quote_validator" ]] \
@@ -672,79 +583,6 @@ check_provisioning_policy() {
     || fail "TPM quote verification tool mismatch: $tpm_quote_tool"
   [[ "$tpm_quote_hardware_required" == "true" && "$tpm_quote_mainnet_required" == "true" ]] \
     || fail "TPM quote verification must be required for hardware TPM and mainnet operator-signing"
-  [[ "$tpm_sealing_schema" == "monarch-protocore-tpm-sealing-evidence/v1" ]] \
-    || fail "TPM sealing evidence schema mismatch: $tpm_sealing_schema"
-  [[ "$tpm_sealing_schema_path" == "schemas/protocore-tpm-sealing-evidence.schema.json" ]] \
-    || fail "TPM sealing evidence schema path mismatch: $tpm_sealing_schema_path"
-  [[ -f "$ROOT_DIR/$tpm_sealing_schema_path" ]] \
-    || fail "TPM sealing evidence schema file is missing: $tpm_sealing_schema_path"
-  [[ "$tpm_sealing_validator" == "scripts/validate-tpm-sealing-evidence.sh" ]] \
-    || fail "TPM sealing evidence validator mismatch: $tpm_sealing_validator"
-  [[ -x "$ROOT_DIR/$tpm_sealing_validator" ]] \
-    || fail "TPM sealing evidence validator is missing or not executable: $tpm_sealing_validator"
-  [[ "$tpm_sealing_required" == "true" && "$tpm_sealing_mainnet_required" == "true" && "$tpm_sealing_hardware_required" == "true" ]] \
-    || fail "TPM sealing evidence must be required for operator-signing and mainnet hardware TPM"
-  [[ "$tpm_sealing_payload_schema" == "monarch-protocore-tpm-sealing-payload/v1" ]] \
-    || fail "TPM sealing evidence payload schema mismatch: $tpm_sealing_payload_schema"
-  [[ "$tpm_sealing_canonicalization" == "jq-canonical-sorted-json/v1" && "$tpm_sealing_hash" == "sha256" ]] \
-    || fail "TPM sealing evidence payload hash/canonicalization mismatch"
-  [[ "$tpm_sealing_binds_ceremony" == "true" && "$tpm_sealing_binds_enrollment" == "true" ]] \
-    || fail "TPM sealing evidence must bind the key-share ceremony and enrollment manifest"
-  [[ "$tpm_sealing_quote_hashes" == "true" && "$tpm_sealing_policy_binding" == "true" && "$tpm_sealing_unseal_binding" == "true" && "$tpm_sealing_share_hash" == "true" && "$tpm_sealing_object_blobs" == "true" ]] \
-    || fail "TPM sealing evidence must verify quote/event-log hashes, policy binding, unseal binding, sealed share, and TPM2 object blobs"
-  [[ "$tpm_sealing_local_env" == "LOCAL_EVIDENCE_ROOT" && "$tpm_sealing_local_toggle_env" == "VERIFY_LOCAL_FILES" ]] \
-    || fail "TPM sealing evidence local file verification env mismatch"
-  [[ "$lifecycle_schema" == "monarch-protocore-key-share-ceremony/v1" ]] \
-    || fail "key-share lifecycle schema mismatch: $lifecycle_schema"
-  [[ "$lifecycle_schema_path" == "schemas/protocore-key-share-ceremony.schema.json" ]] \
-    || fail "key-share lifecycle schema path mismatch: $lifecycle_schema_path"
-  [[ -f "$ROOT_DIR/$lifecycle_schema_path" ]] \
-    || fail "key-share lifecycle schema file is missing: $lifecycle_schema_path"
-  [[ "$lifecycle_validator" == "scripts/validate-key-share-ceremony.sh" ]] \
-    || fail "key-share lifecycle validator mismatch: $lifecycle_validator"
-  [[ -x "$ROOT_DIR/$lifecycle_validator" ]] \
-    || fail "key-share lifecycle validator is missing or not executable: $lifecycle_validator"
-  [[ "$lifecycle_cluster_size" == "10" && "$lifecycle_threshold" == "7" && "$lifecycle_approval_threshold" == "7" ]] \
-    || fail "key-share lifecycle policy must require 10-member, 7-of-10 ceremonies"
-  [[ "$lifecycle_payload_schema" == "monarch-protocore-key-share-lifecycle-payload/v1" ]] \
-    || fail "key-share lifecycle payload schema mismatch: $lifecycle_payload_schema"
-  [[ "$lifecycle_payload_canonicalization" == "jq-canonical-sorted-json/v1" && "$lifecycle_payload_hash" == "sha256" ]] \
-    || fail "key-share lifecycle payload hash/canonicalization mismatch"
-  [[ "$lifecycle_payload_validator" == "scripts/validate-key-share-ceremony.sh" ]] \
-    || fail "key-share lifecycle payload validator mismatch: $lifecycle_payload_validator"
-  [[ "$lifecycle_payload_ceremony_method" == "submitPendingChange" && "$lifecycle_payload_attestation_method" == "attestDkgReshare" ]] \
-    || fail "key-share lifecycle on-chain method binding mismatch"
-  [[ "$lifecycle_payload_ceremony_selector" == "0x7d09426c" && "$lifecycle_payload_attestation_selector" == "0x36e34030" ]] \
-    || fail "key-share lifecycle on-chain selector binding mismatch"
-  [[ "$lifecycle_mainnet" == "true" && "$lifecycle_hardware_tpm" == "true" && "$lifecycle_tpm_binding" == "true" && "$lifecycle_on_chain" == "true" ]] \
-    || fail "key-share lifecycle policy must require mainnet hardware TPM, TPM evidence hash binding, and on-chain lifecycle evidence"
-  [[ "$lifecycle_local_env" == "LOCAL_EVIDENCE_ROOT" && "$lifecycle_local_toggle_env" == "VERIFY_LOCAL_FILES" ]] \
-    || fail "key-share lifecycle local file verification env mismatch"
-  [[ "$lifecycle_verifies_dkg_file" == "true" && "$lifecycle_verifies_all_share_files" == "true" ]] \
-    || fail "key-share lifecycle policy must verify the staged DKG transcript and all sealed-share output files"
-  [[ "$handoff_schema" == "monarch-protocore-key-share-handoff/v1" ]] \
-    || fail "key-share handoff schema mismatch: $handoff_schema"
-  [[ "$handoff_schema_path" == "schemas/protocore-key-share-handoff.schema.json" ]] \
-    || fail "key-share handoff schema path mismatch: $handoff_schema_path"
-  [[ -f "$ROOT_DIR/$handoff_schema_path" ]] \
-    || fail "key-share handoff schema file is missing: $handoff_schema_path"
-  [[ "$handoff_renderer" == "scripts/render-key-share-handoff.sh" ]] \
-    || fail "key-share handoff renderer mismatch: $handoff_renderer"
-  [[ -x "$ROOT_DIR/$handoff_renderer" ]] \
-    || fail "key-share handoff renderer is missing or not executable: $handoff_renderer"
-  [[ "$handoff_validator" == "scripts/validate-key-share-handoff.sh" ]] \
-    || fail "key-share handoff validator mismatch: $handoff_validator"
-  [[ -x "$ROOT_DIR/$handoff_validator" ]] \
-    || fail "key-share handoff validator is missing or not executable: $handoff_validator"
-  [[ "$handoff_source_schema" == "monarch-protocore-key-share-ceremony/v1" ]] \
-    || fail "key-share handoff source schema mismatch: $handoff_source_schema"
-  [[ "$handoff_required" == "true" && "$handoff_ceremony_sha" == "true" && "$handoff_roster_binding" == "true" && "$handoff_share_binding" == "true" && "$handoff_transcript_binding" == "true" ]] \
-    || fail "key-share handoff policy must require ceremony hash, roster, TPM-sealed share, and DKG transcript binding"
-  [[ "$handoff_local_env" == "LOCAL_EVIDENCE_ROOT" && "$handoff_local_toggle_env" == "VERIFY_LOCAL_FILES" ]] \
-    || fail "key-share handoff local file verification env mismatch"
-  [[ "$handoff_sealed_path" == "$tpm_sealed_path" && "$handoff_dkg_path" == "$dkg_path" ]] \
-    || fail "key-share handoff import paths must match Protocore TPM/DKG service paths"
-
   local extension_tar service_config forbidden
   extension_tar="$(extension_tar_from_metadata)"
   service_config="$(tar -xOf "$extension_tar" rootfs/usr/local/etc/containers/protocore.yaml 2>/dev/null)" \
@@ -767,18 +605,8 @@ check_provisioning_policy() {
       || fail "protocore service config does not pin TPM quote file: $tpm_quote_path"
     grep -Fx "    - PROTOCORE_TPM_EVENT_LOG_FILE=$tpm_event_log_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin TPM event-log file: $tpm_event_log_path"
-    if [[ "$tpm_sealed_operator_env" == "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE" ]]; then
-      grep -Fx "    - PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=$tpm_sealed_operator_path" <<<"$service_config" >/dev/null \
-        || fail "protocore service config does not pin TPM-sealed operator key file: $tpm_sealed_operator_path"
-    fi
-    grep -Fx "    - PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=$tpm_sealed_path" <<<"$service_config" >/dev/null \
-      || fail "protocore service config does not pin TPM-sealed share compatibility alias: $tpm_sealed_path"
-    if [[ "$key_transcript_env" == "PROTOCORE_KEY_TRANSCRIPT_FILE" ]]; then
-      grep -Fx "    - PROTOCORE_KEY_TRANSCRIPT_FILE=$key_transcript_path" <<<"$service_config" >/dev/null \
-        || fail "protocore service config does not pin key transcript file: $key_transcript_path"
-    fi
-    grep -Fx "    - PROTOCORE_DKG_TRANSCRIPT_FILE=$dkg_path" <<<"$service_config" >/dev/null \
-      || fail "protocore service config does not pin DKG transcript file: $dkg_path"
+    grep -Fx "    - PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=$tpm_sealed_operator_path" <<<"$service_config" >/dev/null \
+      || fail "protocore service config does not pin TPM-sealed operator key file: $tpm_sealed_operator_path"
     grep -Fx "    - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=$lythiumseal_path" <<<"$service_config" >/dev/null \
       || fail "protocore service config does not pin LythiumSeal operator key file: $lythiumseal_path"
   fi
@@ -876,7 +704,7 @@ check_incident_response_policy() {
       contract: "0x0000000000000000000000000000000000001005",
       method: "emergencyKeyRotation",
       selector: "0x0aeeafbf",
-      argument: "target_bls_pubkey,effective_epoch,intent_id"
+      argument: "target_operator_pubkey,effective_epoch,intent_id"
     }
   ' "$metadata_path" >/dev/null || fail "incident response policy has mismatched on-chain executor bindings"
   for reason in routine-upgrade parameter-change protocol-direction account-censorship asset-confiscation ongoing-supervision; do
@@ -928,13 +756,13 @@ check_audit_trail_policy() {
     || fail "audit trail policy must support hash chaining and two approval high-risk actions"
   [[ "$desktop_binding" == "true" && "$on_chain_binding" == "true" && "$diff_required" == "true" ]] \
     || fail "audit trail policy must require desktop/on-chain receipt binding and diff-vs-intent hashes"
-  [[ "$peer_count" == "2" && "$supported_count" -ge 17 ]] \
+  [[ "$peer_count" == "2" && "$supported_count" -ge 15 ]] \
     || fail "audit trail policy must enumerate peer-vouched freeze actions and supported actions"
   for action in freeze-admission kill-switch-freeze; do
     jq -e --arg action "$action" '.audit_trail_policy.peer_vouches_required_for | index($action)' "$metadata_path" >/dev/null \
       || fail "audit trail policy lacks peer-vouched freeze action: $action"
   done
-  for action in enrollment dkg-ceremony tpm-sealing key-share-handoff key-share-rotation incident-response disaster-recovery upgrade rollback desktop-operation chat-e2e release-promotion; do
+  for action in enrollment tpm-sealing operator-key-rotation incident-response disaster-recovery upgrade rollback desktop-operation chat-e2e release-promotion; do
     jq -e --arg action "$action" '.audit_trail_policy.supported_actions | index($action)' "$metadata_path" >/dev/null \
       || fail "audit trail policy lacks supported action: $action"
   done
@@ -951,7 +779,7 @@ check_disaster_recovery_policy() {
   manifest_required="$(jq -r '.disaster_recovery_policy.restore_manifest_required_before_cluster_rejoin // false' "$metadata_path")"
   modes_count="$(jq -r '(.disaster_recovery_policy.supported_recovery_modes // []) | length' "$metadata_path")"
   checks_count="$(jq -r '(.disaster_recovery_policy.required_post_restore_checks // []) | length' "$metadata_path")"
-  signing_required="$(jq -r '.disaster_recovery_policy.signing_node_key_share_recovery_required // false' "$metadata_path")"
+  signing_required="$(jq -r '.disaster_recovery_policy.signing_node_operator_key_recovery_required // false' "$metadata_path")"
   on_chain_required="$(jq -r '.disaster_recovery_policy.on_chain_recovery_required_for_mainnet_signing // false' "$metadata_path")"
   calldata_hash="$(jq -r '.disaster_recovery_policy.on_chain_recovery_calldata_hash // ""' "$metadata_path")"
   executor_method="$(jq -r '.disaster_recovery_policy.on_chain_executor_methods.recover_operator_node // ""' "$metadata_path")"
@@ -976,7 +804,7 @@ check_disaster_recovery_policy() {
   [[ "$modes_count" == "4" && "$checks_count" -ge 4 ]] \
     || fail "disaster recovery policy must enumerate recovery modes and post-restore checks"
   [[ "$signing_required" == "true" && "$on_chain_required" == "true" ]] \
-    || fail "disaster recovery policy must require signing-node key-share and mainnet on-chain recovery evidence"
+    || fail "disaster recovery policy must require signing-node operator-key and mainnet on-chain recovery evidence"
   [[ "$executor_method" == "recoverOperatorNode" ]] \
     || fail "disaster recovery policy recover executor method mismatch: $executor_method"
   [[ "$calldata_hash" == "sha256" ]] \

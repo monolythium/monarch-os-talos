@@ -43,7 +43,7 @@ approved Desktop operation result instead of only a loose file attachment.
 
 The audit trail is a local, publishable contract. It does not execute the
 operation and it does not replace the specific enrollment, TPM sealing,
-key-share, incident-response, disaster-recovery, certificate-rotation, or
+operator-key, incident-response, disaster-recovery, certificate-rotation, or
 Desktop e2e validators. It binds those artifacts together with the operator's
 reason, receipt set, and expected-state delta so reviewers can prove what was
 intended, what was observed, and who approved the action.

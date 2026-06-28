@@ -37,7 +37,7 @@
             "cryptographic-break",
             "bridge-exploit",
             "adversarial-fork",
-            "key-share-compromise",
+            "operator-key-compromise",
             "release-provenance-failure"
           ]
         },
@@ -91,7 +91,7 @@
             "isolate-node",
             "stop-signing",
             "rotate-certs",
-            "rotate-key-share",
+            "rotate-operator-key",
             "pause-bridge-route",
             "freeze-admission",
             "emergency-key-rotation",

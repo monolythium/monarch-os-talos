@@ -397,24 +397,6 @@ jobs:
       - name: Verify on-chain enrollment runner
         run: make test-on-chain-enrollment-runner
 
-      - name: Verify enrollment and key-share validators
-        run: make test-enrollment-and-key-share-validators
-
-      - name: Verify key-share ceremony runner
-        run: make test-key-share-ceremony-runner
-
-      - name: Verify key-share handoff
-        run: make test-key-share-handoff
-
-      - name: Verify production DKG ceremony runner
-        run: make test-production-dkg-ceremony-runner
-
-      - name: Verify DKG reshare attestation
-        run: make test-dkg-reshare-attestation
-
-      - name: Verify TPM sealing evidence
-        run: make test-tpm-sealing-evidence
-
       - name: Verify operator audit trail
         run: make test-operator-audit-trail
 

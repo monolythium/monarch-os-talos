@@ -112,7 +112,7 @@
               "chain-id-match",
               "protocore-rpc-healthy",
               "no-double-sign-window",
-              "key-share-resealed"
+              "operator-key-resealed"
             ]
           },
           "minItems": 3,
@@ -120,19 +120,15 @@
         }
       }
     },
-    "key_share_recovery": {
+    "operator_key_recovery": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "ceremony_manifest_sha256",
-        "sealed_share_sha256",
-        "dkg_transcript_hash",
+        "sealed_operator_key_sha256",
         "approval_count"
       ],
       "properties": {
-        "ceremony_manifest_sha256": { "$ref": "#/$defs/hash32" },
-        "sealed_share_sha256": { "$ref": "#/$defs/hash32" },
-        "dkg_transcript_hash": { "$ref": "#/$defs/hash32" },
+        "sealed_operator_key_sha256": { "$ref": "#/$defs/hash32" },
         "approval_count": { "type": "integer", "minimum": 7 }
       }
     },

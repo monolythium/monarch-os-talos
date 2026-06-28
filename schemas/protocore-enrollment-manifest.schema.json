@@ -70,7 +70,7 @@
         "standby_members": {
           "const": 3
         },
-        "dkg_epoch": {
+        "roster_epoch": {
           "type": ["string", "integer"],
           "pattern": "^[0-9]+$"
         }
@@ -198,10 +198,9 @@
               "additionalProperties": false,
               "required": [
                 "pcrs",
-                "key_share_refs",
+                "operator_key_refs",
                 "policy_digest",
-                "dkg_transcript_sha256",
-                "sealed_share_sha256"
+                "sealed_operator_key_sha256"
               ],
               "properties": {
                 "pcrs": {
@@ -213,7 +212,7 @@
                     "maximum": 23
                   }
                 },
-                "key_share_refs": {
+                "operator_key_refs": {
                   "type": "array",
                   "minItems": 1,
                   "items": {
@@ -225,11 +224,7 @@
                   "type": "string",
                   "pattern": "^(0x)?[0-9a-fA-F]{64}$"
                 },
-                "dkg_transcript_sha256": {
-                  "type": "string",
-                  "pattern": "^(0x)?[0-9a-fA-F]{64}$"
-                },
-                "sealed_share_sha256": {
+                "sealed_operator_key_sha256": {
                   "type": "string",
                   "pattern": "^(0x)?[0-9a-fA-F]{64}$"
                 }
@@ -258,8 +253,7 @@
         "quote_sha256",
         "event_log_sha256",
         "pcr_policy_hash",
-        "dkg_transcript_sha256",
-        "sealed_share_sha256",
+        "sealed_operator_key_sha256",
         "attestation_payload_hash"
       ],
       "properties": {
@@ -322,11 +316,7 @@
           "type": "string",
           "pattern": "^(0x)?[0-9a-fA-F]{64}$"
         },
-        "dkg_transcript_sha256": {
-          "type": "string",
-          "pattern": "^(0x)?[0-9a-fA-F]{64}$"
-        },
-        "sealed_share_sha256": {
+        "sealed_operator_key_sha256": {
           "type": "string",
           "pattern": "^(0x)?[0-9a-fA-F]{64}$"
         },
@@ -370,7 +360,7 @@
               "threshold",
               "active_members",
               "standby_members",
-              "dkg_epoch"
+              "roster_epoch"
             ]
           },
           "attestation": {
@@ -399,19 +389,8 @@
                   { "required": ["operator_identity_key"] }
                 ]
               },
-              {
-                "anyOf": [
-                  { "required": ["key_transcript"] },
-                  { "required": ["dkg_transcript"] }
-                ]
-              },
               { "required": ["lythiumseal_operator_key"] },
-              {
-                "anyOf": [
-                  { "required": ["tpm_sealed_operator_key"] },
-                  { "required": ["tpm_sealed_bls_share"] }
-                ]
-              }
+              { "required": ["tpm_sealed_operator_key"] }
             ]
           }
         }
@@ -485,8 +464,7 @@
               "quote_sha256",
               "event_log_sha256",
               "pcr_policy_hash",
-              "dkg_transcript_sha256",
-              "sealed_share_sha256",
+              "sealed_operator_key_sha256",
               "attestation_payload_hash"
             ]
           }

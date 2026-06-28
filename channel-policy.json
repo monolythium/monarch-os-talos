@@ -96,7 +96,7 @@
     "mainnet": {
       "enabled": false,
       "release_stage": "blocked",
-      "blocked_reason": "Mainnet promotion is disabled until the mainnet genesis, operator roster, enrollment/key-share lifecycle, disaster-recovery executors, configured QEMU e2e, Desktop e2e, deterministic rebuild verification, active dm-verity rootfs/root-hash attestation, and incident runbooks are published.",
+      "blocked_reason": "Mainnet promotion is disabled until the mainnet genesis, operator roster, enrollment and operator-key lifecycle, disaster-recovery executors, configured QEMU e2e, Desktop e2e, deterministic rebuild verification, active dm-verity rootfs/root-hash attestation, and incident runbooks are published.",
       "chain_profile": "mainnet",
       "chain_id": "",
       "desktop_channel": "mainnet",

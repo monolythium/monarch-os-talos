@@ -38,24 +38,22 @@ Operator-signing manifests must include:
 - `operator.position` (`active` or `standby`) and `operator.index` (`0`-`9`)
 - `cluster.id`, `cluster.size = 10`, `cluster.threshold = 7`,
   `cluster.active_members = 7`, `cluster.standby_members = 3`, and
-  `cluster.dkg_epoch`
+  `cluster.roster_epoch`
 - `release.expected_digest`
 - `attestation.tpm`, including TPM mode, PCR bank, PCR values for PCRs
   `0`, `2`, `4`, and `7`, quote/event-log file paths, quote/event-log
   SHA-256 hashes, a quote nonce, and the PCR policy digest used to seal the
   operator key
 - `attestation.tpm.sealed_key_policy`, including `lythiumseal_operator_key`
-  in `key_share_refs`, the PCR policy digest, the key transcript hash, and
-  the staged LythiumSeal operator-key hash
+  in `operator_key_refs`, the PCR policy digest, and the staged, TPM-sealed
+  operator-key hash (`sealed_operator_key_sha256`)
 - `attestation.tpm.quote_verification` for hardware TPM nodes, including the
   `tpm2_checkquote` tool binding, AK public key file, quote-signature file,
   PCR digest file, and SHA-256 hashes for those verifier inputs
-- `secret_files.operator_consensus_key`, `secret_files.key_transcript`,
+- `secret_files.operator_consensus_key` (or `operator_identity_key`),
   `secret_files.lythiumseal_operator_key`, and
   `secret_files.tpm_sealed_operator_key`, all as file paths under
-  `/var/lib/protocore`. Legacy aliases `operator_identity_key`,
-  `dkg_transcript`, and `tpm_sealed_bls_share` are still accepted when they
-  point to the same files.
+  `/var/lib/protocore`. Each operator holds its own ML-DSA-65 key.
 
 The manifest must not carry inline mnemonics, private keys, passphrases, or key
 material. Those values must be delivered as files under the node data partition
@@ -68,8 +66,8 @@ certificate hash, `registration_method = "register"`, the node-registry
 `register(bytes32,string,bytes32,uint32,uint32,bytes,bytes,bytes)` selector
 `0xf4896df2`, registration calldata hash,
 `attestation_embedded_in_registration = true`, and the exact release digest,
-TPM quote hash, event-log hash, PCR policy hash, key transcript hash,
-LythiumSeal operator-key hash, and attestation payload hash submitted to the registry. The
+TPM quote hash, event-log hash, PCR policy hash, sealed operator-key hash,
+and attestation payload hash submitted to the registry. The
 local validator checks that the on-chain cluster/operator fields and
 attestation evidence hashes match the rest of the manifest, recomputes the canonical
 `monarch-protocore-operator-attestation-payload/v1` SHA-256 hash, and checks
@@ -113,19 +111,11 @@ Set strict mode to `false` only for testnet rehearsals.
 
 `make validate-tpm-attestation-evidence` resolves each `/var/lib/protocore/...`
 path under `LOCAL_EVIDENCE_ROOT`, verifies that the quote, event log,
-LythiumSeal operator key, key transcript, and hardware quote verifier files hash to
+LythiumSeal operator key, and hardware quote verifier files hash to
 the manifest values, and runs `tpm2_checkquote` for `hardware-tpm2` manifests by
 default. Set `REQUIRE_TPM2_CHECKQUOTE=false` only for synthetic rehearsal
-bundles that do not contain a real TPM quote signature.
-
-`make validate-tpm-sealing-evidence` is the companion proof that the sealed
-operator key was produced by a TPM policy-bound sealing flow. It validates
-`monarch-protocore-tpm-sealing-evidence/v1`, binds the seal record back to the
-operator enrollment and key-share ceremony when those manifests are supplied,
-hash-checks the staged quote/event-log, key transcript, LythiumSeal operator
-key, TPM2 public/private/context blobs, and command log under
-`LOCAL_EVIDENCE_ROOT`, and requires the unseal validation hash to match the
-declared operator-key hash.
+bundles that do not contain a real TPM quote signature. The sealed operator key
+is each operator's own ML-DSA-65 key, sealed to the node TPM policy.
 
 The extension entrypoint also supports a fail-closed runtime switch for
 operator-signing nodes:
@@ -135,17 +125,12 @@ operator-signing nodes:
 - PROTOCORE_TPM_QUOTE_FILE=/var/lib/protocore/attestation/quote.bin
 - PROTOCORE_TPM_EVENT_LOG_FILE=/var/lib/protocore/attestation/eventlog.bin
 - PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
-- PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
-- PROTOCORE_KEY_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
-- PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
 - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
 ```
 
 When enabled, startup requires enrollment, release digest evidence, TPM quote
-evidence, a staged LythiumSeal operator key, and a key transcript. Final key
-rotation and recovery ceremonies are still tracked in the readiness docs. The
-`PROTOCORE_TPM_SEALED_BLS_SHARE_FILE` and `PROTOCORE_DKG_TRANSCRIPT_FILE` envs
-remain compatibility aliases for existing tooling.
+evidence, and a staged, TPM-sealed LythiumSeal operator key. Final key
+rotation and recovery flows are still tracked in the readiness docs.
 
 For images that should mint the LythiumSeal operator key on first boot instead
 of staging it in the enrollment bundle, provide the non-secret seal-seat
@@ -171,5 +156,5 @@ the generated Talos machine config, and `smoke-qemu` can be run with
 `REQUIRE_ENROLLMENT_RUNTIME_PROOF=true` and
 `REQUIRE_TPM_BINDING_RUNTIME_PROOF=true`. Those gates prove, through Talos API
 reads from the booted node, that the manifest, release digest, TPM quote/event
-log, LythiumSeal operator key, and key transcript are present before the release
+log, and TPM-sealed LythiumSeal operator key are present before the release
 artifact verifier accepts the smoke result.

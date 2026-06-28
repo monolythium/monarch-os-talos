@@ -33,19 +33,13 @@ PROTOCORE_REQUIRE_TPM_BINDING="${PROTOCORE_REQUIRE_TPM_BINDING:-false}"
 PROTOCORE_TPM_QUOTE_FILE="${PROTOCORE_TPM_QUOTE_FILE:-}"
 PROTOCORE_TPM_EVENT_LOG_FILE="${PROTOCORE_TPM_EVENT_LOG_FILE:-}"
 PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="${PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE:-}"
-PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-}"
-PROTOCORE_KEY_TRANSCRIPT_FILE="${PROTOCORE_KEY_TRANSCRIPT_FILE:-}"
-PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-}"
 PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-}"
 PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY="${PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY:-}"
 PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX="${PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX:-}"
 PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH="${PROTOCORE_LYTHIUMSEAL_OPERATOR_EPOCH:-}"
 if [[ "$PROTOCORE_REQUIRE_TPM_BINDING" == "true" ]]; then
   PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE="${PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE:-/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc}"
-  PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="${PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE:-${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE}}"
-  PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="${PROTOCORE_TPM_SEALED_BLS_SHARE_FILE:-$PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE}"
-  PROTOCORE_KEY_TRANSCRIPT_FILE="${PROTOCORE_KEY_TRANSCRIPT_FILE:-${PROTOCORE_DKG_TRANSCRIPT_FILE:-/var/lib/protocore/secrets/key-transcript.json}}"
-  PROTOCORE_DKG_TRANSCRIPT_FILE="${PROTOCORE_DKG_TRANSCRIPT_FILE:-$PROTOCORE_KEY_TRANSCRIPT_FILE}"
+  PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="${PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE:-$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE}"
 fi
 DM_VERITY_EXPECTED_ROOT_HASHES="${DM_VERITY_EXPECTED_ROOT_HASHES:-}"
 
@@ -244,9 +238,6 @@ jq -s \
   --arg protocore_tpm_quote_file "$PROTOCORE_TPM_QUOTE_FILE" \
   --arg protocore_tpm_event_log_file "$PROTOCORE_TPM_EVENT_LOG_FILE" \
   --arg protocore_tpm_sealed_operator_key_file "$PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE" \
-  --arg protocore_tpm_sealed_bls_share_file "$PROTOCORE_TPM_SEALED_BLS_SHARE_FILE" \
-  --arg protocore_key_transcript_file "$PROTOCORE_KEY_TRANSCRIPT_FILE" \
-  --arg protocore_dkg_transcript_file "$PROTOCORE_DKG_TRANSCRIPT_FILE" \
   --arg protocore_lythiumseal_operator_key_file "$PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE" \
   --arg protocore_generate_lythiumseal_operator_key "$PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY" \
   --arg protocore_lythiumseal_operator_index "$PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX" \
@@ -329,10 +320,7 @@ jq -s \
       prohibited_inline_secret_env: [
         "PROTOCORE_KEYSTORE_PASSPHRASE",
         "PROTOCORE_OPERATOR_MNEMONIC",
-        "PROTOCORE_OPERATOR_PRIVATE_KEY",
-        "PROTOCORE_BLS_SHARE",
-        "PROTOCORE_CLUSTER_KEY_SHARE",
-        "PROTOCORE_KEY_SHARE"
+        "PROTOCORE_OPERATOR_PRIVATE_KEY"
       ],
       enrollment: {
         required: $protocore_require_enrollment,
@@ -375,12 +363,6 @@ jq -s \
         event_log_file_path: $protocore_tpm_event_log_file,
         sealed_operator_key_file_env: "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE",
         sealed_operator_key_file_path: $protocore_tpm_sealed_operator_key_file,
-        sealed_bls_share_file_env: "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE",
-        sealed_bls_share_file_path: $protocore_tpm_sealed_bls_share_file,
-        key_transcript_file_env: "PROTOCORE_KEY_TRANSCRIPT_FILE",
-        key_transcript_file_path: $protocore_key_transcript_file,
-        dkg_transcript_file_env: "PROTOCORE_DKG_TRANSCRIPT_FILE",
-        dkg_transcript_file_path: $protocore_dkg_transcript_file,
         lythiumseal_operator_key_file_env: "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
         lythiumseal_operator_key_file_path: $protocore_lythiumseal_operator_key_file,
         lythiumseal_operator_encapsulation_key_file_path: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.ek",
@@ -398,72 +380,6 @@ jq -s \
           tool: "tpm2_checkquote",
           required_for_hardware_tpm: true,
           required_for_mainnet_operator_signing: true
-        },
-        sealing_evidence: {
-          schema: "monarch-protocore-tpm-sealing-evidence/v1",
-          schema_path: "schemas/protocore-tpm-sealing-evidence.schema.json",
-          validator: "scripts/validate-tpm-sealing-evidence.sh",
-          required_for_operator_signing: true,
-          required_for_mainnet_operator_signing: true,
-          requires_hardware_tpm_on_mainnet: true,
-          signed_payload_schema: "monarch-protocore-tpm-sealing-payload/v1",
-          canonicalization: "jq-canonical-sorted-json/v1",
-          hash: "sha256",
-          binds_key_share_ceremony: true,
-          binds_enrollment_manifest: true,
-          verifies_tpm_quote_event_log_hashes: true,
-          verifies_policy_digest_binding: true,
-          verifies_unseal_plaintext_hash_binding: true,
-          verifies_sealed_share_file_hash: true,
-          verifies_tpm2_object_blobs: true,
-          local_file_hash_verification_env: "LOCAL_EVIDENCE_ROOT",
-          local_file_hash_verification_toggle_env: "VERIFY_LOCAL_FILES"
-        }
-      },
-      key_share_lifecycle: {
-        schema: "monarch-protocore-key-share-ceremony/v1",
-        schema_path: "schemas/protocore-key-share-ceremony.schema.json",
-        validator: "scripts/validate-key-share-ceremony.sh",
-        cluster_size: 10,
-        threshold: 7,
-        approval_threshold: 7,
-        required_for_mainnet_operator_signing: true,
-        requires_hardware_tpm_on_mainnet: true,
-        requires_tpm_evidence_hash_binding: true,
-        local_file_hash_verification_env: "LOCAL_EVIDENCE_ROOT",
-        local_file_hash_verification_toggle_env: "VERIFY_LOCAL_FILES",
-        verifies_dkg_transcript_file: true,
-        verifies_all_sealed_share_output_files: true,
-        on_chain_lifecycle_payload: {
-          schema: "monarch-protocore-key-share-lifecycle-payload/v1",
-          canonicalization: "jq-canonical-sorted-json/v1",
-          hash: "sha256",
-          validator: "scripts/validate-key-share-ceremony.sh",
-          methods: {
-            ceremony: "submitPendingChange",
-            ceremony_selector: "0x7d09426c",
-            attestation: "attestDkgReshare",
-            attestation_selector: "0x36e34030"
-          }
-        },
-        requires_on_chain_lifecycle_on_mainnet: true
-      },
-      key_share_handoff: {
-        schema: "monarch-protocore-key-share-handoff/v1",
-        schema_path: "schemas/protocore-key-share-handoff.schema.json",
-        renderer: "scripts/render-key-share-handoff.sh",
-        validator: "scripts/validate-key-share-handoff.sh",
-        source_schema: "monarch-protocore-key-share-ceremony/v1",
-        required_for_operator_signing_import: true,
-        ceremony_manifest_sha256_required: true,
-        verifies_operator_roster_binding: true,
-        verifies_tpm_sealed_share_hash_binding: true,
-        verifies_dkg_transcript_hash_binding: true,
-        local_file_hash_verification_env: "LOCAL_EVIDENCE_ROOT",
-        local_file_hash_verification_toggle_env: "VERIFY_LOCAL_FILES",
-        import_paths: {
-          sealed_share_file: $protocore_tpm_sealed_bls_share_file,
-          dkg_transcript_file: $protocore_dkg_transcript_file
         }
       },
       external_secret_file_env: [
@@ -472,9 +388,6 @@ jq -s \
         "PROTOCORE_TPM_QUOTE_FILE",
         "PROTOCORE_TPM_EVENT_LOG_FILE",
         "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE",
-        "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE",
-        "PROTOCORE_KEY_TRANSCRIPT_FILE",
-        "PROTOCORE_DKG_TRANSCRIPT_FILE",
         "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE"
       ]
     },
@@ -526,7 +439,7 @@ jq -s \
           contract: "0x0000000000000000000000000000000000001005",
           method: "emergencyKeyRotation",
           selector: "0x0aeeafbf",
-          argument: "target_bls_pubkey,effective_epoch,intent_id"
+          argument: "target_operator_pubkey,effective_epoch,intent_id"
         }
       },
       disallowed_freeze_reasons: [
@@ -561,10 +474,8 @@ jq -s \
       ],
       supported_actions: [
         "enrollment",
-        "dkg-ceremony",
         "tpm-sealing",
-        "key-share-handoff",
-        "key-share-rotation",
+        "operator-key-rotation",
         "certificate-rotation",
         "backup",
         "restore",
@@ -599,7 +510,7 @@ jq -s \
         "chain-id-match",
         "protocore-rpc-healthy"
       ],
-      signing_node_key_share_recovery_required: true,
+      signing_node_operator_key_recovery_required: true,
       on_chain_recovery_required_for_mainnet_signing: true,
       on_chain_recovery_calldata_hash: "sha256",
       on_chain_executor_methods: {

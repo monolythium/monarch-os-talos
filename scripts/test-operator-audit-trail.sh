@@ -165,20 +165,20 @@ trap 'rm -rf "$tmp_dir"' EXIT
 
 evidence_root="$tmp_dir/evidence"
 mkdir -p "$evidence_root/audit"
-printf 'key-share ceremony evidence\n' >"$evidence_root/audit/key-share-ceremony.json"
+printf 'tpm-sealing evidence\n' >"$evidence_root/audit/tpm-sealing-evidence.json"
 jq -n \
   --arg h4 "$(printf '4%.0s' {1..64})" \
   '{
     id: "receipt-rotation-001",
     createdAt: "2026-06-01T00:00:01.000Z",
     kind: "rotate-keys",
-    title: "Rotate key share",
+    title: "Rotate operator key",
     status: "ok",
-    message: "submitted DKG re-share attestation",
+    message: "submitted operator key rotation",
     txHash: ("0x" + $h4),
-    transport: "dkg-reshare-tx",
+    transport: "operator-key-rotation-tx",
     service: null,
-    action: "attestDkgReshare",
+    action: "rotateOperatorKey",
     endpoint: "https://rpc.monolythium.com",
     nodeAddress: "mono1operator000000000000000000000000000000000",
     command: null,
@@ -186,7 +186,7 @@ jq -n \
     artifactSha256: null
   }' >"$evidence_root/audit/desktop-receipt.json"
 stamp_desktop_receipt_hash "$evidence_root/audit/desktop-receipt.json"
-ceremony_sha="$(sha256sum "$evidence_root/audit/key-share-ceremony.json" | awk '{print $1}')"
+evidence_sha="$(sha256sum "$evidence_root/audit/tpm-sealing-evidence.json" | awk '{print $1}')"
 receipt_sha="$(sha256sum "$evidence_root/audit/desktop-receipt.json" | awk '{print $1}')"
 receipt_audit_hash="$(jq -r '.auditPayloadHash' "$evidence_root/audit/desktop-receipt.json")"
 
@@ -219,7 +219,7 @@ jq -n \
   --arg h5 "$h5" \
   --arg h6 "$h6" \
   --arg h7 "$h7" \
-  --arg ceremony_sha "$ceremony_sha" \
+  --arg evidence_sha "$evidence_sha" \
   --arg receipt_sha "$receipt_sha" \
   --arg receipt_audit_hash "$receipt_audit_hash" \
   --arg desktop_schema "$DESKTOP_OPERATION_RECEIPT_SCHEMA" \
@@ -227,9 +227,9 @@ jq -n \
   '{
     schema_version: "monarch-operator-audit-trail/v1",
     audit: {
-      id: "audit-key-share-rotation-001",
+      id: "audit-operator-key-rotation-001",
       created_at: "2026-06-01T00:00:00Z",
-      action: "key-share-rotation",
+      action: "operator-key-rotation",
       reason: "planned operator rotation",
       previous_audit_hash: $h7
     },
@@ -248,10 +248,10 @@ jq -n \
       protocore_digest: $h1
     },
     subject: {
-      type: "key-share-ceremony",
-      id: "ks-rotation-001",
-      schema_version: "monarch-protocore-key-share-ceremony/v1",
-      sha256: $ceremony_sha
+      type: "tpm-sealing-evidence",
+      id: "opkey-rotation-001",
+      schema_version: "monarch-operator-key-rotation/v1",
+      sha256: $evidence_sha
     },
     intent: {
       summary: "rotate one standby operator into the active set",
@@ -262,11 +262,11 @@ jq -n \
     },
     evidence: [
       {
-        label: "ceremony",
+        label: "tpm-sealing-evidence",
         type: "manifest",
-        path: "/audit/key-share-ceremony.json",
-        schema_version: "monarch-protocore-key-share-ceremony/v1",
-        sha256: $ceremony_sha
+        path: "/audit/tpm-sealing-evidence.json",
+        schema_version: "monarch-operator-key-rotation/v1",
+        sha256: $evidence_sha
       },
       {
         label: "desktop-receipt",
@@ -337,7 +337,7 @@ expect_fail bad-desktop-receipt-file \
   "$ROOT_DIR/scripts/validate-operator-audit-trail.sh" "$bad_desktop_receipt_file"
 
 cp -R "$evidence_root" "$bad_local_hash_root"
-printf 'tampered ceremony evidence\n' >"$bad_local_hash_root/audit/key-share-ceremony.json"
+printf 'tampered evidence\n' >"$bad_local_hash_root/audit/tpm-sealing-evidence.json"
 expect_fail bad-local-evidence-hash \
   env LOCAL_EVIDENCE_ROOT="$bad_local_hash_root" VERIFY_LOCAL_FILES=true EXPECTED_CHAIN_PROFILE=testnet EXPECTED_CHAIN_ID=69420 \
   "$ROOT_DIR/scripts/validate-operator-audit-trail.sh" "$valid"

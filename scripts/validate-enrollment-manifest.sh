@@ -144,7 +144,7 @@ canonical_attestation_payload_hash() {
         threshold: .cluster.threshold,
         active_members: .cluster.active_members,
         standby_members: .cluster.standby_members,
-        dkg_epoch: (.cluster.dkg_epoch | tostring)
+        roster_epoch: (.cluster.roster_epoch | tostring)
       },
       endpoint_policy: (.endpoint_policy // {}),
       release: {
@@ -159,10 +159,9 @@ canonical_attestation_payload_hash() {
         quote_nonce: (.attestation.tpm.quote_nonce | norm_hash),
         sealed_key_policy: {
           pcrs: .attestation.tpm.sealed_key_policy.pcrs,
-          key_share_refs: .attestation.tpm.sealed_key_policy.key_share_refs,
+          operator_key_refs: .attestation.tpm.sealed_key_policy.operator_key_refs,
           policy_digest: (.attestation.tpm.sealed_key_policy.policy_digest | norm_hash),
-          dkg_transcript_sha256: (.attestation.tpm.sealed_key_policy.dkg_transcript_sha256 | norm_hash),
-          sealed_share_sha256: (.attestation.tpm.sealed_key_policy.sealed_share_sha256 | norm_hash)
+          sealed_operator_key_sha256: (.attestation.tpm.sealed_key_policy.sealed_operator_key_sha256 | norm_hash)
         },
         quote_verification: quote_verification
       }
@@ -211,9 +210,8 @@ if jq -e '
   paths(scalars) as $p
   | ($p | map(tostring) | join(".")) as $path
   | select(
-      ($path | test("(?i)(mnemonic|private_key|passphrase|key_share|cluster_key_share|bls_share)"))
+      ($path | test("(?i)(mnemonic|private_key|passphrase)"))
       and (($path | startswith("secret_files.")) | not)
-      and (($path | startswith("attestation.tpm.sealed_key_policy.key_share_refs")) | not)
     )
 ' "$MANIFEST" >/dev/null; then
   fail "secret-like fields must be file references under secret_files"
@@ -234,7 +232,7 @@ if [[ "$role" == "operator-signing" ]]; then
   cluster_threshold="$(field '.cluster.threshold')"
   cluster_active="$(field '.cluster.active_members')"
   cluster_standby="$(field '.cluster.standby_members')"
-  dkg_epoch="$(field '.cluster.dkg_epoch')"
+  roster_epoch="$(field '.cluster.roster_epoch')"
   tpm_mode="$(field '.attestation.tpm.mode')"
   pcr_bank="$(field '.attestation.tpm.pcr_bank')"
   quote_file="$(field '.attestation.tpm.quote_file')"
@@ -243,8 +241,7 @@ if [[ "$role" == "operator-signing" ]]; then
   event_log_sha256="$(field '.attestation.tpm.event_log_sha256')"
   quote_nonce="$(field '.attestation.tpm.quote_nonce')"
   pcr_policy_hash="$(field '.attestation.tpm.sealed_key_policy.policy_digest')"
-  dkg_transcript_sha256="$(field '.attestation.tpm.sealed_key_policy.dkg_transcript_sha256')"
-  sealed_share_sha256="$(field '.attestation.tpm.sealed_key_policy.sealed_share_sha256')"
+  sealed_operator_key_sha256="$(field '.attestation.tpm.sealed_key_policy.sealed_operator_key_sha256')"
   quote_verification_present="$(jq -r '.attestation.tpm | has("quote_verification")' "$MANIFEST")"
   on_chain_present="$(jq -r 'has("on_chain_registration")' "$MANIFEST")"
 
@@ -261,7 +258,7 @@ if [[ "$role" == "operator-signing" ]]; then
   [[ "$cluster_threshold" == "7" ]] || fail "cluster.threshold must be 7 for 7-of-10 clusters"
   [[ "$cluster_active" == "7" ]] || fail "cluster.active_members must be 7"
   [[ "$cluster_standby" == "3" ]] || fail "cluster.standby_members must be 3"
-  [[ "$dkg_epoch" =~ ^[0-9]+$ ]] || fail "cluster.dkg_epoch is required and must be numeric"
+  [[ "$roster_epoch" =~ ^[0-9]+$ ]] || fail "cluster.roster_epoch is required and must be numeric"
 
   case "$tpm_mode" in
     hardware-tpm2|vtpm-testnet) ;;
@@ -283,8 +280,7 @@ if [[ "$role" == "operator-signing" ]]; then
   validate_hash32 "attestation.tpm.event_log_sha256" "$event_log_sha256"
   validate_hash32 "attestation.tpm.quote_nonce" "$quote_nonce"
   validate_hash32 "attestation.tpm.sealed_key_policy.policy_digest" "$pcr_policy_hash"
-  validate_hash32 "attestation.tpm.sealed_key_policy.dkg_transcript_sha256" "$dkg_transcript_sha256"
-  validate_hash32 "attestation.tpm.sealed_key_policy.sealed_share_sha256" "$sealed_share_sha256"
+  validate_hash32 "attestation.tpm.sealed_key_policy.sealed_operator_key_sha256" "$sealed_operator_key_sha256"
 
   for pcr in 0 2 4 7; do
     jq -e --arg pcr "$pcr" '
@@ -298,10 +294,10 @@ if [[ "$role" == "operator-signing" ]]; then
       || fail "attestation.tpm.sealed_key_policy.pcrs must include PCR $pcr"
   done
   jq -e '
-    (.attestation.tpm.sealed_key_policy.key_share_refs // [])
+    (.attestation.tpm.sealed_key_policy.operator_key_refs // [])
     | index("lythiumseal_operator_key")
   ' "$MANIFEST" >/dev/null \
-    || fail "attestation.tpm.sealed_key_policy.key_share_refs must include lythiumseal_operator_key"
+    || fail "attestation.tpm.sealed_key_policy.operator_key_refs must include lythiumseal_operator_key"
 
   if [[ "$tpm_mode" == "hardware-tpm2" ]]; then
     [[ "$quote_verification_present" == "true" ]] \
@@ -327,15 +323,14 @@ if [[ "$role" == "operator-signing" ]]; then
   fi
 
   validate_secret_file_ref_any "operator consensus key" operator_consensus_key operator_identity_key
-  validate_secret_file_ref_any "key transcript" key_transcript dkg_transcript
   validate_secret_file_ref_any "LythiumSeal operator key" lythiumseal_operator_key
-  validate_secret_file_ref_any "TPM-sealed operator key" tpm_sealed_operator_key tpm_sealed_bls_share
+  validate_secret_file_ref_any "TPM-sealed operator key" tpm_sealed_operator_key
 
   while IFS= read -r ref; do
     [[ -n "$ref" ]] || continue
     jq -e --arg ref "$ref" '.secret_files[$ref] // empty' "$MANIFEST" >/dev/null \
-      || fail "attestation.tpm.sealed_key_policy.key_share_refs references missing secret_files.$ref"
-  done < <(jq -r '.attestation.tpm.sealed_key_policy.key_share_refs[]?' "$MANIFEST")
+      || fail "attestation.tpm.sealed_key_policy.operator_key_refs references missing secret_files.$ref"
+  done < <(jq -r '.attestation.tpm.sealed_key_policy.operator_key_refs[]?' "$MANIFEST")
 
   if [[ "$on_chain_present" == "true" ]]; then
     registration_contract="$(field '.on_chain_registration.registry_contract')"
@@ -353,8 +348,7 @@ if [[ "$role" == "operator-signing" ]]; then
     registration_quote_hash="$(field '.on_chain_registration.quote_sha256')"
     registration_event_log_hash="$(field '.on_chain_registration.event_log_sha256')"
     registration_pcr_policy_hash="$(field '.on_chain_registration.pcr_policy_hash')"
-    registration_dkg_transcript_hash="$(field '.on_chain_registration.dkg_transcript_sha256')"
-    registration_sealed_share_hash="$(field '.on_chain_registration.sealed_share_sha256')"
+    registration_sealed_operator_key_hash="$(field '.on_chain_registration.sealed_operator_key_sha256')"
     registration_payload_hash="$(field '.on_chain_registration.attestation_payload_hash')"
 
     [[ "$registration_contract" =~ ^0x[0-9a-fA-F]{40}$ ]] \
@@ -381,15 +375,13 @@ if [[ "$role" == "operator-signing" ]]; then
     validate_hash32 "on_chain_registration.quote_sha256" "$registration_quote_hash"
     validate_hash32 "on_chain_registration.event_log_sha256" "$registration_event_log_hash"
     validate_hash32 "on_chain_registration.pcr_policy_hash" "$registration_pcr_policy_hash"
-    validate_hash32 "on_chain_registration.dkg_transcript_sha256" "$registration_dkg_transcript_hash"
-    validate_hash32 "on_chain_registration.sealed_share_sha256" "$registration_sealed_share_hash"
+    validate_hash32 "on_chain_registration.sealed_operator_key_sha256" "$registration_sealed_operator_key_hash"
     validate_hash32 "on_chain_registration.attestation_payload_hash" "$registration_payload_hash"
     hash32_equals "on_chain_registration.release_expected_digest" "$release_digest" "$registration_release_digest"
     hash32_equals "on_chain_registration.quote_sha256" "$quote_sha256" "$registration_quote_hash"
     hash32_equals "on_chain_registration.event_log_sha256" "$event_log_sha256" "$registration_event_log_hash"
     hash32_equals "on_chain_registration.pcr_policy_hash" "$pcr_policy_hash" "$registration_pcr_policy_hash"
-    hash32_equals "on_chain_registration.dkg_transcript_sha256" "$dkg_transcript_sha256" "$registration_dkg_transcript_hash"
-    hash32_equals "on_chain_registration.sealed_share_sha256" "$sealed_share_sha256" "$registration_sealed_share_hash"
+    hash32_equals "on_chain_registration.sealed_operator_key_sha256" "$sealed_operator_key_sha256" "$registration_sealed_operator_key_hash"
     hash32_equals "on_chain_registration.attestation_payload_hash" \
       "$(canonical_attestation_payload_hash)" \
       "$registration_payload_hash"

@@ -64,7 +64,7 @@ jq -S -n \
       threshold: 7,
       active_members: 7,
       standby_members: 3,
-      dkg_epoch: 2
+      roster_epoch: 2
     },
     release: {
       expected_digest: $h0
@@ -86,21 +86,17 @@ jq -S -n \
         quote_nonce: $h3,
         sealed_key_policy: {
           pcrs: [0, 2, 4, 7],
-          key_share_refs: ["lythiumseal_operator_key"],
+          operator_key_refs: ["lythiumseal_operator_key"],
           policy_digest: $h4,
-          dkg_transcript_sha256: $h5,
-          sealed_share_sha256: $h6
+          sealed_operator_key_sha256: $h6
         }
       }
     },
     secret_files: {
       operator_consensus_key: "/var/lib/protocore/secrets/operator-consensus.key",
-      key_transcript: "/var/lib/protocore/secrets/key-transcript.json",
       lythiumseal_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
       tpm_sealed_operator_key: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc",
-      operator_identity_key: "/var/lib/protocore/secrets/operator-consensus.key",
-      dkg_transcript: "/var/lib/protocore/secrets/key-transcript.json",
-      tpm_sealed_bls_share: "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc"
+      operator_identity_key: "/var/lib/protocore/secrets/operator-consensus.key"
     }
   }' >"$input_manifest"
 
@@ -159,7 +155,7 @@ canonical_attestation_payload_hash() {
         threshold: .cluster.threshold,
         active_members: .cluster.active_members,
         standby_members: .cluster.standby_members,
-        dkg_epoch: (.cluster.dkg_epoch | tostring)
+        roster_epoch: (.cluster.roster_epoch | tostring)
       },
       endpoint_policy: (.endpoint_policy // {}),
       release: {
@@ -174,10 +170,9 @@ canonical_attestation_payload_hash() {
         quote_nonce: (.attestation.tpm.quote_nonce | norm_hash),
         sealed_key_policy: {
           pcrs: .attestation.tpm.sealed_key_policy.pcrs,
-          key_share_refs: .attestation.tpm.sealed_key_policy.key_share_refs,
+          operator_key_refs: .attestation.tpm.sealed_key_policy.operator_key_refs,
           policy_digest: (.attestation.tpm.sealed_key_policy.policy_digest | norm_hash),
-          dkg_transcript_sha256: (.attestation.tpm.sealed_key_policy.dkg_transcript_sha256 | norm_hash),
-          sealed_share_sha256: (.attestation.tpm.sealed_key_policy.sealed_share_sha256 | norm_hash)
+          sealed_operator_key_sha256: (.attestation.tpm.sealed_key_policy.sealed_operator_key_sha256 | norm_hash)
         },
         quote_verification: quote_verification
       }
@@ -209,8 +204,7 @@ jq -S \
     quote_sha256: .attestation.tpm.quote_sha256,
     event_log_sha256: .attestation.tpm.event_log_sha256,
     pcr_policy_hash: .attestation.tpm.sealed_key_policy.policy_digest,
-    dkg_transcript_sha256: .attestation.tpm.sealed_key_policy.dkg_transcript_sha256,
-    sealed_share_sha256: .attestation.tpm.sealed_key_policy.sealed_share_sha256,
+    sealed_operator_key_sha256: .attestation.tpm.sealed_key_policy.sealed_operator_key_sha256,
     attestation_payload_hash: $h8
   }' "$MONARCH_ENROLLMENT_INPUT_MANIFEST" >"$MONARCH_ENROLLMENT_ON_CHAIN_MANIFEST"
 

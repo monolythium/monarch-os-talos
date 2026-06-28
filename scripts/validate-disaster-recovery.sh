@@ -162,20 +162,18 @@ jq -e '
   )
 ' "$MANIFEST" >/dev/null || fail "approvals must use ML-DSA-65 signatures and signed payload hashes"
 
-key_share_present="$(jq -r 'has("key_share_recovery")' "$MANIFEST")"
+operator_key_present="$(jq -r 'has("operator_key_recovery")' "$MANIFEST")"
 if [[ "$node_role" == "operator-signing" || "$recovery_type" == "signing-node-reseal" ]]; then
-  [[ "$key_share_present" == "true" ]] \
-    || fail "operator-signing recovery requires key_share_recovery evidence"
-  validate_hash32 "key_share_recovery.ceremony_manifest_sha256" "$(field '.key_share_recovery.ceremony_manifest_sha256')"
-  validate_hash32 "key_share_recovery.sealed_share_sha256" "$(field '.key_share_recovery.sealed_share_sha256')"
-  validate_hash32 "key_share_recovery.dkg_transcript_hash" "$(field '.key_share_recovery.dkg_transcript_hash')"
-  key_share_approvals="$(field '.key_share_recovery.approval_count')"
-  [[ "$key_share_approvals" =~ ^[0-9]+$ && "$key_share_approvals" -ge 7 ]] \
-    || fail "key_share_recovery.approval_count must be at least 7"
+  [[ "$operator_key_present" == "true" ]] \
+    || fail "operator-signing recovery requires operator_key_recovery evidence"
+  validate_hash32 "operator_key_recovery.sealed_operator_key_sha256" "$(field '.operator_key_recovery.sealed_operator_key_sha256')"
+  operator_key_approvals="$(field '.operator_key_recovery.approval_count')"
+  [[ "$operator_key_approvals" =~ ^[0-9]+$ && "$operator_key_approvals" -ge 7 ]] \
+    || fail "operator_key_recovery.approval_count must be at least 7"
   (( approval_count >= 7 )) \
     || fail "operator-signing recovery approvals must include at least 7 unique signers"
-  jq -e '.restore.post_restore_checks | index("no-double-sign-window") and index("key-share-resealed")' "$MANIFEST" >/dev/null \
-    || fail "operator-signing recovery must check no-double-sign-window and key-share-resealed"
+  jq -e '.restore.post_restore_checks | index("no-double-sign-window") and index("operator-key-resealed")' "$MANIFEST" >/dev/null \
+    || fail "operator-signing recovery must check no-double-sign-window and operator-key-resealed"
 fi
 
 on_chain_present="$(jq -r 'has("on_chain_recovery")' "$MANIFEST")"
@@ -220,7 +218,7 @@ jq -n \
   --arg node_role "$node_role" \
   --arg backup_mode "$backup_mode" \
   --argjson approval_count "$approval_count" \
-  --argjson key_share_checked "$([[ "$key_share_present" == "true" ]] && printf true || printf false)" \
+  --argjson operator_key_checked "$([[ "$operator_key_present" == "true" ]] && printf true || printf false)" \
   --argjson on_chain_checked "$([[ "$on_chain_present" == "true" ]] && printf true || printf false)" \
   '{
     ok: true,
@@ -230,6 +228,6 @@ jq -n \
     node_role: $node_role,
     backup_mode: $backup_mode,
     approval_count: $approval_count,
-    key_share_recovery_checked: $key_share_checked,
+    operator_key_recovery_checked: $operator_key_checked,
     on_chain_recovery_checked: $on_chain_checked
   }'

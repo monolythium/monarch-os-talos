@@ -180,9 +180,8 @@ splits nodes into canary/rolling waves, writes per-node Talos/Desktop payloads,
 and rejects any wave that exceeds `fleet.max_unavailable`. For operator-signing
 nodes it also checks active signing capacity: by default, no wave may take enough
 active operators down to drop below `fleet.operator_signing_quorum` (normally 7).
-If a 7-active cluster has no spare active signing capacity, promote/rotate
-through the key-share lifecycle first rather than rolling an active signer below
-quorum.
+If a 7-active cluster has no spare active signing capacity, bring an additional
+operator online first rather than rolling an active signer below quorum.
 
 ```bash
 talosctl upgrade --nodes <node-ip> --image <new-signed-image-reference>
@@ -235,7 +234,7 @@ There is no supported in-place hot backup command in the current preview. Do not
 backup; it can capture an inconsistent database. For now, the honest recovery posture is:
 
 - archive nodes can rebuild by re-syncing from peers;
-- signing/operator nodes need the final first-boot enrollment and key-share lifecycle
+- signing/operator nodes need the final first-boot enrollment and operator-key lifecycle
   before a production restore runbook is complete;
 - disk-image snapshots are acceptable only when the VM or bare-metal disk is quiesced,
   the release digest is recorded, and the restore is verified against the same
@@ -244,7 +243,7 @@ backup; it can capture an inconsistent database. For now, the honest recovery po
 The local disaster-recovery manifest contract is now documented in
 [`docs/disaster-recovery.md`](./disaster-recovery.md). `make validate-disaster-recovery`
 fails hot backups, requires stopped/offline evidence for data restores, binds the
-manifest to chain/genesis/release digests, and requires key-share recovery evidence
+manifest to chain/genesis/release digests, and requires operator-key recovery evidence
 for signing-node reseals before a node rejoins a cluster. The final automated
 backup path now includes a local stopped/offline archive packager,
 `make protocore-offline-backup`, which refuses running service state and emits
@@ -303,7 +302,7 @@ Monarch OS uses the machine's **TPM** (Trusted Platform Module — a tamper-resi
 security chip on the motherboard) for **measured boot**: as the machine boots, the
 firmware, bootloader, kernel, and OS image are each hashed into the TPM's **PCRs**
 (Platform Configuration Registers — write-once-per-boot registers that record exactly
-what code ran). A node's signing key share can be **sealed** to those measurements,
+what code ran). A node's own ML-DSA-65 signing key can be **sealed** to those measurements,
 meaning the key is only usable if the machine booted the exact, expected software.
 
 This interacts with upgrades in one specific way worth understanding: a new OS image
@@ -370,5 +369,5 @@ will be published when the first non-preview signed release ships.
 - **Measured boot / PCRs** — the boot process records hashes of each component it runs
   into the TPM's Platform Configuration Registers, producing a verifiable record of
   exactly what software booted.
-- **Sealing** — binding a secret (such as a signing key share) so it is only usable when
+- **Sealing** — binding a secret (such as an operator's own signing key) so it is only usable when
   the machine booted the expected, measured software.

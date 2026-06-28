@@ -47,7 +47,7 @@ If you can't use Desktop, provision over the Talos maintenance API directly:
      --output ./cluster-config
    ```
 
-2. Add the `protocore` extension service config to the machine config. Start from `examples/protocore-extension-service-config.yaml`. Do not put passphrases, mnemonics, private keys, or key shares directly in `environment:` — the `protocore-entrypoint` rejects known inline secret env vars and placeholder values at start, and `make verify-artifacts REQUIRE_PROVISIONING_POLICY=true` checks the shipped service config does the same. (To stage operator-signing enrollment later, validate the manifest first with `make validate-enrollment-manifest ENROLLMENT_MANIFEST=./enrollment.json EXPECTED_CHAIN_PROFILE=testnet EXPECTED_CHAIN_ID=69420 REQUIRE_RELEASE_DIGEST=true`.)
+2. Add the `protocore` extension service config to the machine config. Start from `examples/protocore-extension-service-config.yaml`. Do not put passphrases, mnemonics, or private keys directly in `environment:` — the `protocore-entrypoint` rejects known inline secret env vars and placeholder values at start, and `make verify-artifacts REQUIRE_PROVISIONING_POLICY=true` checks the shipped service config does the same. (To stage operator-signing enrollment later, validate the manifest first with `make validate-enrollment-manifest ENROLLMENT_MANIFEST=./enrollment.json EXPECTED_CHAIN_PROFILE=testnet EXPECTED_CHAIN_ID=69420 REQUIRE_RELEASE_DIGEST=true`.)
 
 3. Apply the config and confirm the extension and service:
 
@@ -87,7 +87,7 @@ Implemented in this repository:
 
 Still required before a production operator release:
 
-- final key-share rotation, recovery, and audit ceremonies through the enrollment flow
+- final operator-key rotation, recovery, and audit flows through the enrollment flow
 - cluster admission and seal-roster updates for newly generated operator identities
 - final production Talos certificate issuance automation; rotation manifests and Desktop evidence gates are now checked locally
 - mainnet genesis/operator roster publication before any mainnet channel is enabled

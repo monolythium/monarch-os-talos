@@ -197,9 +197,6 @@ static int reject_inline_secret_envs(void) {
         "PROTOCORE_KEYSTORE_PASSPHRASE",
         "PROTOCORE_OPERATOR_MNEMONIC",
         "PROTOCORE_OPERATOR_PRIVATE_KEY",
-        "PROTOCORE_BLS_SHARE",
-        "PROTOCORE_CLUSTER_KEY_SHARE",
-        "PROTOCORE_KEY_SHARE",
         NULL,
     };
 
@@ -397,25 +394,8 @@ static int verify_provisioning_policy(int operator_enabled, int first_boot, cons
     const char *tpm_quote_file = getenv("PROTOCORE_TPM_QUOTE_FILE");
     const char *tpm_event_log_file = getenv("PROTOCORE_TPM_EVENT_LOG_FILE");
     const char *tpm_sealed_operator_key_file = getenv("PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE");
-    const char *tpm_sealed_bls_share_file = getenv("PROTOCORE_TPM_SEALED_BLS_SHARE_FILE");
-    const char *key_transcript_file = getenv("PROTOCORE_KEY_TRANSCRIPT_FILE");
-    const char *dkg_transcript_file = getenv("PROTOCORE_DKG_TRANSCRIPT_FILE");
-    const char *tpm_sealed_key_file =
-        (tpm_sealed_operator_key_file && tpm_sealed_operator_key_file[0])
-            ? tpm_sealed_operator_key_file
-            : tpm_sealed_bls_share_file;
-    const char *tpm_sealed_key_label =
-        (tpm_sealed_operator_key_file && tpm_sealed_operator_key_file[0])
-            ? "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE"
-            : "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE";
-    const char *transcript_file =
-        (key_transcript_file && key_transcript_file[0])
-            ? key_transcript_file
-            : dkg_transcript_file;
-    const char *transcript_label =
-        (key_transcript_file && key_transcript_file[0])
-            ? "PROTOCORE_KEY_TRANSCRIPT_FILE"
-            : "PROTOCORE_DKG_TRANSCRIPT_FILE";
+    const char *tpm_sealed_key_file = tpm_sealed_operator_key_file;
+    const char *tpm_sealed_key_label = "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE";
     const char *lythiumseal_operator_key_file = env_or_default(
         "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
         "/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc");
@@ -445,9 +425,6 @@ static int verify_provisioning_policy(int operator_enabled, int first_boot, cons
         "PROTOCORE_TPM_QUOTE_FILE",
         "PROTOCORE_TPM_EVENT_LOG_FILE",
         "PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE",
-        "PROTOCORE_TPM_SEALED_BLS_SHARE_FILE",
-        "PROTOCORE_KEY_TRANSCRIPT_FILE",
-        "PROTOCORE_DKG_TRANSCRIPT_FILE",
         "PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE",
         "PROTOCORE_GENERATE_LYTHIUMSEAL_OPERATOR_KEY",
         "PROTOCORE_LYTHIUMSEAL_OPERATOR_INDEX",
@@ -499,8 +476,7 @@ static int verify_provisioning_policy(int operator_enabled, int first_boot, cons
     if (is_truthy(require_tpm_binding)) {
         if (require_readable_file(tpm_quote_file, "PROTOCORE_TPM_QUOTE_FILE") != 0 ||
             require_readable_file(tpm_event_log_file, "PROTOCORE_TPM_EVENT_LOG_FILE") != 0 ||
-            require_readable_file(tpm_sealed_key_file, tpm_sealed_key_label) != 0 ||
-            require_readable_file(transcript_file, transcript_label) != 0) {
+            require_readable_file(tpm_sealed_key_file, tpm_sealed_key_label) != 0) {
             return -1;
         }
         if (operator_enabled &&

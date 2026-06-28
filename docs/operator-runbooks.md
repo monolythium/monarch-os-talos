@@ -9,7 +9,7 @@ live operator key rotation/recovery rehearsals, and Desktop end-to-end release
 tests before this can be treated as a production operations manual. The local
 on-chain enrollment and membership-change runners now exist as fail-closed
 wrappers around external registration and roster-update commands and the
-existing TPM/key-share validators. Remaining gaps are tracked in
+existing TPM/operator-key validators. Remaining gaps are tracked in
 [`final-product-readiness.md`](./final-product-readiness.md).
 
 ## 0. Verify a release
@@ -106,7 +106,7 @@ talosctl gen config monarch-node https://<node-ip>:6443 \
 Merge the `monarch-protocore` extension service config into the generated
 machine config. Start from
 [`examples/protocore-extension-service-config.yaml`](../examples/protocore-extension-service-config.yaml).
-Do not place passphrases, mnemonics, private keys, key shares,
+Do not place passphrases, mnemonics, private keys,
 or credential-bearing database URLs directly in `environment:`.
 
 Apply the config through the Talos maintenance API:
@@ -130,7 +130,7 @@ talosctl --nodes <node-ip> --endpoints <node-ip> logs ext-protocore
 ## 2. Enroll the node
 
 Enrollment binds the node to its intended chain, operator role, cluster
-position, release digest, and TPM/key-share evidence. Validate the enrollment
+position, release digest, and TPM/operator-key evidence. Validate the enrollment
 manifest before copying it to the node:
 
 ```bash
@@ -172,10 +172,10 @@ DAG round, quorum hash, calldata hash, and canonical attestation payload hash.
 The default strict runner also requires hardware TPM and local TPM evidence.
 
 For operator nodes, the manifest must describe a 10-member cluster with
-a 7-of-10 signing threshold, an active or standby operator index, a key
-transcript epoch, TPM PCR quote references, quote/event-log hashes, PCR policy
+a 7-of-10 signing threshold, an active or standby operator index, a roster
+epoch, TPM PCR quote references, quote/event-log hashes, PCR policy
 hash, and file references under `/var/lib/protocore` for the operator consensus
-key, key transcript, LythiumSeal operator key, and TPM-sealed operator key.
+key, LythiumSeal operator key, and TPM-sealed operator key.
 Hardware TPM manifests must also include `tpm2_checkquote` verifier inputs.
 Mainnet operator-signing
 manifests must use hardware TPM 2.0, not the testnet vTPM mode, and must include
@@ -202,24 +202,20 @@ For signing nodes with TPM-bound operator keys, enable:
 - PROTOCORE_TPM_QUOTE_FILE=/var/lib/protocore/attestation/quote.bin
 - PROTOCORE_TPM_EVENT_LOG_FILE=/var/lib/protocore/attestation/eventlog.bin
 - PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
-- PROTOCORE_TPM_SEALED_BLS_SHARE_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
-- PROTOCORE_KEY_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
-- PROTOCORE_DKG_TRANSCRIPT_FILE=/var/lib/protocore/secrets/key-transcript.json
 - PROTOCORE_LYTHIUMSEAL_OPERATOR_KEY_FILE=/var/lib/protocore/operator/threshold/lythiumseal-operator-key.bin.enc
 ```
 
 Startup is expected to fail closed when the manifest, digest, TPM evidence, or
-secret file references are missing. `PROTOCORE_TPM_SEALED_BLS_SHARE_FILE` and
-`PROTOCORE_DKG_TRANSCRIPT_FILE` remain compatibility aliases for older release
-tooling.
+secret file references are missing. Each operator holds its own ML-DSA-65 key;
+`PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE` is the TPM-sealed copy of that key.
 
 Release QEMU smoke rehearses this gate with synthetic testnet-only material:
 `make smoke-qemu-config` stages an operator-signing enrollment manifest, digest
-file, vTPM quote/event-log, TPM-sealed LythiumSeal operator key, and key
-transcript into the generated Talos machine config. The release verifier requires
+file, vTPM quote/event-log, and TPM-sealed LythiumSeal operator key into the
+generated Talos machine config. The release verifier requires
 `REQUIRE_ENROLLMENT_RUNTIME_PROOF=true` and
 `REQUIRE_TPM_BINDING_RUNTIME_PROOF=true` for testnet promotion, so the same
-smoke run must prove enrollment and TPM/key-transcript file evidence before the
+smoke run must prove enrollment and TPM/operator-key file evidence before the
 Protocore RPC probe is accepted.
 
 ## 3. Connect Monarch Desktop
@@ -394,9 +390,9 @@ make fleet-upgrade-plan \
 The fleet plan is also a dry-run artifact. It batches nodes into canary/rolling
 waves, emits the Talos Upgrade API and Desktop operation payload for each node,
 requires the same DR manifest gate for migration releases, and fails if a wave
-would reduce active operator-signing nodes below quorum. A 7-active signing
-cluster must rotate/promote capacity through the key-share lifecycle before
-taking an active signer down.
+would reduce active operator-signing nodes below quorum. A cluster with only 7
+online signers has no failover headroom, so bring an additional operator online
+before taking an active signer down.
 
 When the preflight passes, upgrade through Talos API:
 
@@ -427,8 +423,8 @@ safe posture is:
   peers;
 - backups of `/var/lib/protocore` must be taken while `ext-protocore` is stopped
   or while the disk is otherwise quiesced;
-- a signing operator holds its own ML-DSA-65 consensus key, not a share of a
-  shared key, so the safe recovery for a lost or compromised key is to generate
+- a signing operator holds its own ML-DSA-65 consensus key, so the safe recovery
+  for a lost or compromised key is to generate
   a fresh ML-DSA-65 key on the node and re-seat the operator into the cluster
   signing set through the CJ-1 cluster-vote flow rather than to restore old key
   material;
@@ -448,7 +444,7 @@ make validate-disaster-recovery \
   EXPECTED_CHAIN_ID=69420
 ```
 
-For signing-node reseal/recovery the manifest must include key-share recovery
+For signing-node reseal/recovery the manifest must include operator-key recovery
 evidence and at least seven approvals. For mainnet rehearsals, add
 `REQUIRE_ON_CHAIN_RECOVERY=true` so the validator also requires the
 `recoverOperatorNode` executor transaction, DAG round, quorum hash,
@@ -475,53 +471,48 @@ restore. It is intentionally not a hot backup path.
 
 ## 7. Rotate keys or operator membership
 
-Consensus is per-operator: each operator signs with its own ML-DSA-65 key and a
-cluster round certificate is a 7-of-10 bitmap multisig over the independent
-per-operator signatures. There is no shared signing key, no distributed key
-generation, and no threshold-share re-share. Rotating an operator's consensus
-key or changing cluster membership is therefore a roster update over the
-operator's own ML-DSA-65 key, driven by the CJ-1 cluster-vote flow
-(`requestClusterJoin` / `voteClusterAdmit`), not a group-key ceremony. See
+Consensus is per-operator: each operator signs with its own ML-DSA-65 key, and a
+cluster round certificate is a 7-of-N bitmap multi-sig over the independent
+per-operator signatures (`operator_bitmap` bit *i* maps to `operators[i]`). With
+*N* members only 7 signatures are needed, so up to *N*-7 members can be offline
+and the online members' signatures fill the threshold automatically — there is
+no promotion ceremony and no key material is ever moved between operators.
+Rotating an operator's consensus key or changing cluster membership is therefore
+a roster update over the operator's own ML-DSA-65 key, driven by the CJ-1
+cluster-vote flow (`requestClusterJoin` / `voteClusterAdmit`). See
 [Join a cluster](https://docs.monolythium.com/operate/clusters/join-a-cluster/)
 for the canonical model.
 
-The local tooling validates the operator's enrollment bundle and the
-membership-change ceremony manifest. The ceremony manifest describes the cluster
-roster, the membership epoch transition, TPM PCR quote hashes, the per-operator
-sealed consensus key, release digests, and at least seven ML-DSA-65 operator
-approvals. Mainnet ceremonies also require on-chain lifecycle evidence: registry
-contract, transaction hashes, DAG round, quorum certificate hash, the
-node-registry method names and function selectors, calldata hashes, and a
-canonical `monarch-protocore-key-share-lifecycle-payload/v1` hash.
+The local tooling validates the operator's enrollment bundle. The enrollment
+manifest describes the cluster roster, the roster epoch, TPM PCR quote hashes,
+the per-operator sealed consensus key, and release digests. Mainnet enrollment
+also requires on-chain registration evidence: registry contract, transaction
+hashes, DAG round, quorum certificate hash, the node-registry method names and
+function selectors, calldata hashes, and a recomputed canonical
+`monarch-protocore-operator-attestation-payload/v1` hash.
 
 Treat a key rotation or membership change as a planned maintenance event:
 
 1. generate a fresh ML-DSA-65 consensus key on the operator node and seal it to
-   the node TPM policy (the operator holds its own key; nothing is shared with
-   peers);
+   the node TPM policy (the operator holds its own key; no key material is
+   shared with peers);
 2. before signing, run the read-only previews `lyth_previewRequestClusterJoin`
    and `lyth_previewVoteClusterAdmit` and proceed only when each returns
    `ok: true`;
-3. materialize and validate the membership-change ceremony manifest with
-   `make validate-key-share-ceremony`, using `LOCAL_EVIDENCE_ROOT` and
-   `VERIFY_LOCAL_FILES=true` when the staged evidence files are available for
-   hash verification;
-4. validate the TPM seal record for the new key with
-   `make validate-tpm-sealing-evidence`;
-5. render and validate the per-operator import bundle with
-   `make render-key-share-handoff` and `make validate-key-share-handoff`, using
-   `LOCAL_EVIDENCE_ROOT` when the staged `/var/lib/protocore` files are
+3. create a new enrollment manifest for the target role, cluster position,
+   roster epoch, and release digest;
+4. validate it with `make validate-enrollment-manifest`;
+5. validate the TPM seal record for the new key with
+   `make validate-tpm-attestation-evidence`, using `LOCAL_EVIDENCE_ROOT` and
+   `VERIFY_LOCAL_FILES=true` when the staged `/var/lib/protocore` files are
    available for hash verification;
-6. create a new enrollment manifest for the target role, cluster position,
-   membership epoch, and release digest;
-7. validate it with `make validate-enrollment-manifest`;
-8. stage the enrollment bundle and the sealed consensus key under
+6. stage the enrollment bundle and the sealed consensus key under
    `/var/lib/protocore`;
-9. submit the CJ-1 cluster-vote transactions so the cluster re-seats the
+7. submit the CJ-1 cluster-vote transactions so the cluster re-seats the
    operator and rotates the authoritative operator set (membership plus signing
    bitmap) on-chain;
-10. restart `ext-protocore` through Talos API and confirm startup gates pass;
-11. keep the node out of production signing until the chain roster and quorum
+8. restart `ext-protocore` through Talos API and confirm startup gates pass;
+9. keep the node out of production signing until the chain roster and quorum
    state reflect the intended membership.
 
 To retire an operator, deregister it from the node registry and let the bond

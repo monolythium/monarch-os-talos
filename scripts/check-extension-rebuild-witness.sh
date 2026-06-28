@@ -93,8 +93,7 @@ digest_file="$(metadata_field '.provisioning_policy.release_digest.file_path')"
 tpm_required="$(metadata_field '.provisioning_policy.tpm_binding.required')"
 tpm_quote_file="$(metadata_field '.provisioning_policy.tpm_binding.quote_file_path')"
 tpm_event_log_file="$(metadata_field '.provisioning_policy.tpm_binding.event_log_file_path')"
-tpm_sealed_bls_share_file="$(metadata_field '.provisioning_policy.tpm_binding.sealed_bls_share_file_path')"
-dkg_transcript_file="$(metadata_field '.provisioning_policy.tpm_binding.dkg_transcript_file_path')"
+tpm_sealed_operator_key_file="$(metadata_field '.provisioning_policy.tpm_binding.sealed_operator_key_file_path')"
 protocore_source="$(metadata_field '.sources.protocore_binary.source')"
 expected_protocore_sha="$(metadata_field '.sources.protocore_binary.sha256')"
 
@@ -136,8 +135,7 @@ env \
   PROTOCORE_REQUIRE_TPM_BINDING="$tpm_required" \
   PROTOCORE_TPM_QUOTE_FILE="$tpm_quote_file" \
   PROTOCORE_TPM_EVENT_LOG_FILE="$tpm_event_log_file" \
-  PROTOCORE_TPM_SEALED_BLS_SHARE_FILE="$tpm_sealed_bls_share_file" \
-  PROTOCORE_DKG_TRANSCRIPT_FILE="$dkg_transcript_file" \
+  PROTOCORE_TPM_SEALED_OPERATOR_KEY_FILE="$tpm_sealed_operator_key_file" \
   PROTOCORE_SOURCE="$protocore_source" \
   PROTOCORE_BINARY="$PROTOCORE_BINARY" \
   MONO_CORE_DIR="$MONO_CORE_DIR" \

@@ -6,7 +6,7 @@ The supported preview posture is still conservative:
 - archive/RPC nodes can resync from peers;
 - data restores must use an offline or stopped `/var/lib/protocore` backup;
 - hot copies of a running Protocore database are rejected;
-- signing-node recovery requires key-share recovery/reseal evidence before the node rejoins a cluster;
+- signing-node recovery requires operator-key recovery/reseal evidence before the node rejoins a cluster;
 - mainnet signing-node recovery must also carry on-chain recovery executor evidence.
 
 The local contract is `monarch-disaster-recovery/v1`, described by
@@ -30,9 +30,9 @@ make validate-disaster-recovery \
 
 The validator requires release metadata/protocore digests, chain/genesis binding,
 operator approvals, explicit restore checks, and safe backup state. For
-`operator-signing` nodes it also requires a key-share recovery ceremony hash,
-sealed-share hash, DKG transcript hash, at least seven key-share approvals, and
-post-restore checks for the no-double-sign window and key-share reseal.
+`operator-signing` nodes it also requires an operator-key recovery record (the
+sealed operator-key hash), at least seven operator approvals, and post-restore
+checks for the no-double-sign window and operator-key reseal.
 
 For stopped/offline data backups, create the archive and evidence bundle locally:
 
@@ -80,14 +80,14 @@ service state, verifies the archive hash from the backup manifest, rejects
 unsafe archive entries, restores only into an empty or previously marked restore
 directory, and emits `monarch-protocore-offline-restore/v1` evidence containing
 the restore evidence hash, extracted file count, deterministic restored-tree
-hash, and DR fields bound to the release metadata. This tool does not recover
-signing-node key shares; operator-signing
-restores still require the key-share recovery ceremony and, on mainnet,
+hash, and DR fields bound to the release metadata. This tool does not recover a
+signing node's operator key; operator-signing
+restores still require an operator-key recovery record and, on mainnet,
 `recoverOperatorNode` evidence.
 
 Release metadata publishes the disaster-recovery policy and `verify-release-artifacts`
 can fail a release whose metadata does not advertise the schema, validator, safe
-backup rules, signing-node key-share recovery requirement, and mainnet on-chain
+backup rules, signing-node operator-key recovery requirement, and mainnet on-chain
 executor method (`recoverOperatorNode`). When `on_chain_recovery` is present,
 the validator now requires the node-registry executor contract, selector
 `0xe58729e6`, the recovered operator peer id, and a SHA-256 hash of the exact
