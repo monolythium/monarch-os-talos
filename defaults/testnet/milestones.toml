@@ -146,8 +146,8 @@ block_timestamp_wall_clock_height = 83000
 # --- Cassette upgrade: open-seat marketplace primitive (#147, audit-fixed) ----
 # Activates the five node-registry (0x1005) open-seat selectors
 # (advertiseSeat/applyForSeat/voteSeatAdmit/withdrawSeatApplication/closeSeat)
-# at height 87500. The fleet runs the corrected v0.2.3 binary B (sha
-# 8fcbaaa2…, which carries the gated selectors WITH the audit fixes #150/#152/
+# at height 87500. The fleet runs the corrected v0.2.4 binary B (sha
+# c09638f0…, which carries the gated selectors WITH the audit fixes #150/#152/
 # #153 — applyForSeat escrows the full self-bond, voteClusterAdmit rejects seat
 # applications, closeSeat enforces advertiser ownership). Below 87500 every
 # binary folds this entry as None and the selectors resolve to UnknownSelector
