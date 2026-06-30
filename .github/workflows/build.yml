@@ -18,12 +18,12 @@ on:
       protocore_tag:
         description: "protocore release tag to embed"
         required: false
-        default: "v0.1.72-testnet"
+        default: "v0.3.0-testnet"
         type: string
       protocore_asset:
         description: "Linux protocore release asset"
         required: false
-        default: "protocore-v0.1.72-testnet-x86_64-linux.tar.gz"
+        default: "protocore-v0.3.0-testnet-x86_64-linux.tar.gz"
         type: string
       release_channel:
         description: "Release channel encoded into artifact metadata"
