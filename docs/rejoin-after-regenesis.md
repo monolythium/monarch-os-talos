@@ -6,9 +6,9 @@ re-genesis, it is stuck on an **abandoned** chain: the old committee no longer
 produces blocks, so your node sits at a frozen height, fails to find peers, or
 quarantines. This guide gets you back onto the current chain.
 
-> **Current chain (2026-07-01):** genesis
-> `0xbf512609bf4cf1f3a3f24b70bd62c4e9e7ed3e0ba495ba004b7245313c1c9e65`,
-> release **`protocore v0.3.1-testnet`** (mono-core `eb403ed9`). The
+> **Current chain (2026-07-02):** genesis
+> `0x323399b40e190833242318122d06a1c3ab0914e838cb044230b1bf44acfb183e`,
+> release **`protocore v0.3.2-testnet`** (mono-core `3c698c85`). The
 > authoritative pin is always
 > [chain-registry / `chains/testnet-69420.toml`](https://github.com/monolythium/chain-registry/blob/master/chains/testnet-69420.toml)
 > (`genesis_hash`, `release_tag`, `binary_sha`). Do not hard-code the values
@@ -73,7 +73,7 @@ A **plain full node** (no bonded seat) has nothing to preserve — skip to §3.
    automatically after the wipe.
 
 The Desktop also keeps `protocore` itself current: after rejoining, use
-**Apply** to move to `v0.3.1-testnet` if you aren't already on it (you do **not**
+**Apply** to move to `v0.3.2-testnet` if you aren't already on it (you do **not**
 re-flash the ISO — see
 [`upgrade-and-storage.md`](./upgrade-and-storage.md#updating-protocore-you-do-not-re-flash-the-iso)).
 
@@ -95,7 +95,7 @@ sudo rm -rf /var/lib/protocore/*        # adjust to your --home path
 
 # 4. Make sure you're on the current release (verify against the registry pin).
 #    Pull the signed release from GitHub and verify its sha256 before installing:
-URL=https://github.com/monolythium/protocore/releases/download/v0.3.1-testnet/protocore-v0.3.1-testnet-x86_64-linux.tar.gz
+URL=https://github.com/monolythium/protocore/releases/download/v0.3.2-testnet/protocore-v0.3.2-testnet-x86_64-linux.tar.gz
 curl -fsSL -o /tmp/p71.tar.gz "$URL"
 # compare against release_tarball_sha256 in chain-registry/chains/testnet-69420.toml
 sha256sum /tmp/p71.tar.gz
@@ -117,7 +117,7 @@ curl -s http://127.0.0.1:8545 -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"web3_clientVersion","params":[]}'
 # expect: protocore/v2/v0.3.0-testnet-4-gc5541d44+c5541d44-dirty
 # (a git-describe from the exact fleet build; the chain-registry advertises this
-#  same binary as release_tag v0.3.1-testnet / binary_sha eb403ed9 — the reliable
+#  same binary as release_tag v0.3.2-testnet / binary_sha 3c698c85 — the reliable
 #  identity check is binary_release_sha256 in chain-registry/chains/testnet-69420.toml)
 
 curl -s http://127.0.0.1:8545 -H 'content-type: application/json' \
@@ -126,7 +126,7 @@ curl -s http://127.0.0.1:8545 -H 'content-type: application/json' \
 ```
 
 Cross-check your genesis hash equals the registry's `genesis_hash`
-(`0xbf5126…`) and your height tracks [monoscan.io](https://monoscan.io). Once
+(`0x323399…`) and your height tracks [monoscan.io](https://monoscan.io). Once
 `state` is `synced` with `lag` ~0 you're rejoined. A committee operator should
 also confirm its seat is active again (the seat carries over because the key was
 re-derived from your mnemonic).
