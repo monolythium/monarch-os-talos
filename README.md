@@ -8,7 +8,7 @@
 
 ## Status: v0.1.9 — signed testnet release
 
-[`v0.1.9`](https://github.com/monolythium/monarch-os-talos/releases) is a cosign-verified ISO/raw image that bakes the signed `protocore v0.3.1-testnet` node binary, boots **enrollment-free**, **resolves the live genesis dynamically from the public [chain-registry](https://github.com/monolythium/chain-registry)** on first boot, and syncs as a full node on testnet chain-69420 (genesis `0xbf512609`; the chain-registry pin is the binding source of truth for the genesis and binary digest). The end-to-end path from a blank machine to a signing cluster seat is documented in [`docs/operator-setup.md`](./docs/operator-setup.md).
+[`v0.1.9`](https://github.com/monolythium/monarch-os-talos/releases) is a cosign-verified ISO/raw image that bakes the signed `protocore v0.3.2-testnet` node binary, boots **enrollment-free**, **resolves the live genesis dynamically from the public [chain-registry](https://github.com/monolythium/chain-registry)** on first boot, and syncs as a full node on testnet chain-69420 (genesis `0x323399b4`; the chain-registry pin is the binding source of truth for the genesis and binary digest). The end-to-end path from a blank machine to a signing cluster seat is documented in [`docs/operator-setup.md`](./docs/operator-setup.md).
 
 Honest scope notes:
 
